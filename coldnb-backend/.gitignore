@@ -1,0 +1,44 @@
+# Build artifacts
+build/
+*.o
+*.d
+
+# Secrets - NEVER commit these
+config/secrets/
+/etc/coldnb/secrets/
+
+# Local configuration (use .example files)
+config/server.conf
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compiled binaries
+*.out
+coldnb-server
+generate_admin_password
+
+# Logs
+*.log
+logs/
+
+# Uploads (local testing)
+uploads/
+
+# Core dumps
+core
+core.*
+
+# Profiling
+*.gcda
+*.gcno
+*.gcov
+gmon.out
+
+# Compiled test binaries
+tests/*.out

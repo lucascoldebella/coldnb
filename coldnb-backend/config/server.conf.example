@@ -1,0 +1,55 @@
+# Coldnb Backend Server Configuration
+# Copy this file to server.conf and customize for your environment
+
+# Server settings
+server.port=8080
+server.workers=4
+server.max_connections=1000
+server.request_timeout=30
+
+# Database (PostgreSQL)
+database.host=localhost
+database.port=5432
+database.name=coldnb
+database.user=coldnb
+database.password_file=/etc/coldnb/secrets/db_password
+database.pool_size=10
+
+# Supabase authentication
+supabase.project_url=https://your-project.supabase.co
+supabase.jwt_secret_file=/etc/coldnb/secrets/jwt_secret
+supabase.anon_key_file=/etc/coldnb/secrets/supabase_anon_key
+
+# Admin authentication (separate from Supabase)
+admin.jwt_secret_file=/etc/coldnb/secrets/admin_jwt_secret
+admin.session_duration=86400
+
+# Stripe payments
+stripe.secret_key_file=/etc/coldnb/secrets/stripe_secret_key
+stripe.webhook_secret_file=/etc/coldnb/secrets/stripe_webhook_secret
+stripe.pix_enabled=true
+
+# Brevo (newsletter)
+brevo.api_key_file=/etc/coldnb/secrets/brevo_api_key
+brevo.list_id=1
+
+# File uploads
+upload.path=/var/www/coldnb/uploads
+upload.max_size=10485760
+upload.allowed_types=image/jpeg,image/png,image/webp
+
+# Logging
+log.level=info
+log.file=/var/log/coldnb/server.log
+log.max_size=104857600
+log.rotate_count=5
+
+# CORS (comma-separated origins, or * for all)
+cors.origins=http://localhost:3000,https://coldnb.com
+cors.methods=GET,POST,PUT,DELETE,OPTIONS
+cors.headers=Content-Type,Authorization
+
+# Rate limiting
+rate_limit.enabled=true
+rate_limit.requests_per_minute=60
+rate_limit.burst=10

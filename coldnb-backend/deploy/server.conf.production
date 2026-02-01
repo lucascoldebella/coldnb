@@ -1,0 +1,133 @@
+# Coldnb Backend - Production Configuration
+# Place in /etc/coldnb/server.conf
+#
+# IMPORTANT: This file should be readable only by the coldnb user
+# chmod 600 /etc/coldnb/server.conf
+
+# =============================================================================
+# Server Configuration
+# =============================================================================
+[server]
+port = 8080
+workers = 4
+max_connections = 1000
+request_timeout = 30
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+[database]
+host = localhost
+port = 5432
+name = coldnb
+user = coldnb
+password_file = /etc/coldnb/secrets/db_password
+pool_size = 20
+timeout = 10
+
+# =============================================================================
+# Supabase Authentication
+# =============================================================================
+[supabase]
+# TODO: Replace with your actual Supabase project URL
+project_url = https://YOUR_PROJECT_ID.supabase.co
+jwt_secret_file = /etc/coldnb/secrets/supabase_jwt_secret
+anon_key_file = /etc/coldnb/secrets/supabase_anon_key
+
+# =============================================================================
+# Admin Authentication
+# =============================================================================
+[admin]
+jwt_secret_file = /etc/coldnb/secrets/admin_jwt_secret
+session_duration = 86400
+
+# =============================================================================
+# Stripe Payment Integration
+# =============================================================================
+[stripe]
+secret_key_file = /etc/coldnb/secrets/stripe_secret_key
+webhook_secret_file = /etc/coldnb/secrets/stripe_webhook_secret
+pix_enabled = true
+
+# =============================================================================
+# Brevo (Email Marketing)
+# =============================================================================
+[brevo]
+api_key_file = /etc/coldnb/secrets/brevo_api_key
+list_id = 1
+
+# =============================================================================
+# File Uploads
+# =============================================================================
+[upload]
+max_size = 10485760
+allowed_types = image/jpeg,image/png,image/gif,image/webp
+upload_dir = /var/www/coldnb/uploads/products
+
+# =============================================================================
+# Logging
+# =============================================================================
+[log]
+level = info
+file = /var/log/coldnb/server.log
+max_size = 104857600
+rotate_count = 5
+
+# =============================================================================
+# CORS Configuration
+# =============================================================================
+[cors]
+# TODO: Replace with your actual domain(s)
+origins = https://YOUR_DOMAIN.com,https://www.YOUR_DOMAIN.com
+methods = GET,POST,PUT,DELETE,OPTIONS
+headers = Content-Type,Authorization,X-Session-ID
+
+# =============================================================================
+# Rate Limiting
+# =============================================================================
+[rate_limit]
+enabled = true
+requests_per_minute = 60
+burst = 20
+
+# =============================================================================
+# SETUP INSTRUCTIONS
+# =============================================================================
+# 1. Create system user and directories:
+#    sudo useradd -r -s /bin/false coldnb
+#    sudo mkdir -p /etc/coldnb/secrets
+#    sudo mkdir -p /var/log/coldnb
+#    sudo mkdir -p /var/www/coldnb/uploads/products
+#    sudo mkdir -p /opt/coldnb
+#
+# 2. Set ownership:
+#    sudo chown coldnb:coldnb /etc/coldnb /etc/coldnb/secrets
+#    sudo chown coldnb:coldnb /var/log/coldnb
+#    sudo chown coldnb:coldnb /var/www/coldnb/uploads -R
+#
+# 3. Set permissions:
+#    sudo chmod 700 /etc/coldnb/secrets
+#    sudo chmod 600 /etc/coldnb/server.conf
+#
+# 4. Create secret files:
+#    echo "your_db_password" | sudo tee /etc/coldnb/secrets/db_password
+#    echo "your_supabase_jwt_secret" | sudo tee /etc/coldnb/secrets/supabase_jwt_secret
+#    echo "your_supabase_anon_key" | sudo tee /etc/coldnb/secrets/supabase_anon_key
+#    echo "your_admin_jwt_secret" | sudo tee /etc/coldnb/secrets/admin_jwt_secret
+#    echo "your_stripe_secret_key" | sudo tee /etc/coldnb/secrets/stripe_secret_key
+#    echo "your_stripe_webhook_secret" | sudo tee /etc/coldnb/secrets/stripe_webhook_secret
+#    echo "your_brevo_api_key" | sudo tee /etc/coldnb/secrets/brevo_api_key
+#
+# 5. Secure secret files:
+#    sudo chmod 600 /etc/coldnb/secrets/*
+#    sudo chown coldnb:coldnb /etc/coldnb/secrets/*
+#
+# 6. Install and start service:
+#    sudo cp deploy/coldnb-server.service /etc/systemd/system/
+#    sudo systemctl daemon-reload
+#    sudo systemctl enable coldnb-server
+#    sudo systemctl start coldnb-server
+#
+# 7. Check status:
+#    sudo systemctl status coldnb-server
+#    sudo journalctl -u coldnb-server -f

@@ -1,0 +1,80 @@
+# Coldnb Backend - Systemd Service
+# Place in /etc/systemd/system/coldnb-server.service
+#
+# Commands:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable coldnb-server
+#   sudo systemctl start coldnb-server
+#   sudo systemctl status coldnb-server
+#   sudo journalctl -u coldnb-server -f
+
+[Unit]
+Description=Coldnb E-commerce Backend Server
+Documentation=https://github.com/coldnb/coldnb-backend
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=coldnb
+Group=coldnb
+
+# Working directory
+WorkingDirectory=/opt/coldnb
+
+# Main executable
+ExecStart=/usr/local/bin/coldnb-server -c /etc/coldnb/server.conf
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+# Stop signal (graceful shutdown)
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Environment
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
+# Allow read access to config and secrets
+ReadOnlyPaths=/etc/coldnb
+ReadWritePaths=/var/log/coldnb
+ReadWritePaths=/var/www/coldnb/uploads
+
+# Capabilities
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# System call filter
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+
+# Limit resources
+LimitNOFILE=65535
+LimitNPROC=4096
+MemoryMax=1G
+TasksMax=256
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=coldnb-server
+
+[Install]
+WantedBy=multi-user.target
