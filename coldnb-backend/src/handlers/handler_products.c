@@ -159,7 +159,7 @@ void handler_products_list(HttpRequest *req, HttpResponse *resp, void *user_data
     }
 
     /* Get total count */
-    char count_query[512];
+    char count_query[2048];
     snprintf(count_query, sizeof(count_query), "SELECT COUNT(*) FROM products WHERE %s", where);
     int total = db_count(conn, count_query, 0, NULL);
 
@@ -168,7 +168,7 @@ void handler_products_list(HttpRequest *req, HttpResponse *resp, void *user_data
     db_build_pagination(&pag, page, per_page, total);
 
     /* Get products */
-    char query[1024];
+    char query[2048];
     snprintf(query, sizeof(query),
              "SELECT id, name, slug, short_description, sku, price, compare_at_price, "
              "brand, stock_quantity, is_featured, is_new, is_sale, category_id "
@@ -416,7 +416,6 @@ void handler_categories_list(HttpRequest *req, HttpResponse *resp, void *user_da
 }
 
 void handler_categories_products(HttpRequest *req, HttpResponse *resp, void *user_data) {
-    DbPool *pool = (DbPool *)user_data;
     const char *slug = http_request_get_path_param(req, "slug");
 
     if (slug == NULL) {

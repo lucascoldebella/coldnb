@@ -3,7 +3,7 @@
 
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -std=c11 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
-CFLAGS += -Iinclude
+CFLAGS += -Iinclude -I/usr/include/postgresql
 CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2
 
 # Debug/Release flags

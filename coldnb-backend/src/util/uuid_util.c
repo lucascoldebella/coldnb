@@ -6,13 +6,13 @@
 #include <string.h>
 #include <uuid/uuid.h>
 
-char *uuid_generate(void) {
+char *coldnb_uuid_generate(void) {
     char *buffer = malloc(UUID_STRING_LENGTH);
     if (buffer == NULL) {
         return NULL;
     }
 
-    if (uuid_generate_buf(buffer, UUID_STRING_LENGTH) != 0) {
+    if (coldnb_uuid_generate_buf(buffer, UUID_STRING_LENGTH) != 0) {
         free(buffer);
         return NULL;
     }
@@ -20,7 +20,7 @@ char *uuid_generate(void) {
     return buffer;
 }
 
-int uuid_generate_buf(char *buffer, size_t size) {
+int coldnb_uuid_generate_buf(char *buffer, size_t size) {
     if (buffer == NULL || size < UUID_STRING_LENGTH) {
         return -1;
     }
@@ -62,7 +62,7 @@ bool uuid_validate(const char *str) {
     return true;
 }
 
-int uuid_compare(const char *a, const char *b) {
+int coldnb_uuid_compare(const char *a, const char *b) {
     if (a == NULL && b == NULL) {
         return 0;
     }

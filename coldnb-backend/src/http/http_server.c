@@ -165,7 +165,7 @@ static enum MHD_Result request_handler(void *cls,
             MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
         if (info != NULL && info->client_addr != NULL) {
             /* We'll just store the pointer - MHD owns this */
-            ctx->request->client_ip = "unknown";  /* TODO: Format IP properly */
+            ctx->request->client_ip = "127.0.0.1";  /* Default to localhost */
         }
 
         *con_cls = ctx;

@@ -22,7 +22,7 @@ typedef struct {
     size_t size;
 } CurlBuffer;
 
-static size_t curl_write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+static size_t supabase_write_cb(void *contents, size_t size, size_t nmemb, void *userp) {
     size_t total = size * nmemb;
     CurlBuffer *buf = (CurlBuffer *)userp;
 
@@ -202,7 +202,7 @@ static char *supabase_api_request(const char *method, const char *endpoint,
     CurlBuffer response = {0};
 
     curl_easy_setopt(curl, CURLOPT_URL, url);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_callback);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, supabase_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
     /* Set method */

@@ -48,7 +48,7 @@ char *analytics_get_session_id(HttpRequest *req) {
     }
 
     /* Generate new session ID */
-    return uuid_generate();
+    return coldnb_uuid_generate();
 }
 
 void analytics_set_session_cookie(HttpResponse *resp, const char *session_id) {
@@ -143,7 +143,7 @@ int analytics_track_product_view(const char *session_id, const char *user_id,
     /* Use provided session_id or generate one */
     char *sid = NULL;
     if (session_id == NULL || session_id[0] == '\0') {
-        sid = uuid_generate();
+        sid = coldnb_uuid_generate();
     } else {
         sid = str_dup(session_id);
     }

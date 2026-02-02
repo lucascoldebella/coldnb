@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 /* Maximum line length in config file */
 #define MAX_LINE_LENGTH 4096

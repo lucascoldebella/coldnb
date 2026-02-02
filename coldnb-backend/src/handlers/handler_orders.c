@@ -424,6 +424,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
     free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
     free(validated_discount_code);
+
+    LOG_INFO("Order created: %s", order_number);
     free(order_number);
 
     cJSON *response = json_create_success(data);
@@ -432,8 +434,6 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
 
     http_response_json(resp, HTTP_STATUS_CREATED, json);
     free(json);
-
-    LOG_INFO("Order created: %s", order_number);
 }
 
 void handler_orders_list(HttpRequest *req, HttpResponse *resp, void *user_data) {
