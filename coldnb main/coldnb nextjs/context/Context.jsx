@@ -1,5 +1,4 @@
 "use client";
-import { allProducts } from "@/data/products";
 import { openCartModal } from "@/utlis/openCartModal";
 import { openWistlistModal } from "@/utlis/openWishlist";
 
@@ -12,10 +11,12 @@ export const useContextElement = () => {
 
 export default function Context({ children }) {
   const [cartProducts, setCartProducts] = useState([]);
-  const [wishList, setWishList] = useState([1, 2, 3]);
-  const [compareItem, setCompareItem] = useState([1, 2, 3]);
-  const [quickViewItem, setQuickViewItem] = useState(allProducts[0]);
-  const [quickAddItem, setQuickAddItem] = useState(1);
+  const [wishList, setWishList] = useState([]);
+  const [compareItem, setCompareItem] = useState([]);
+  const [quickViewItem, setQuickViewItem] = useState({
+    id: 0, title: "", price: 0, imgSrc: "/images/products/placeholder.jpg",
+  });
+  const [quickAddItem, setQuickAddItem] = useState(null);
   const [totalPrice, setTotalPrice] = useState(0);
   useEffect(() => {
     const subtotal = cartProducts.reduce((accumulator, product) => {
@@ -30,10 +31,14 @@ export default function Context({ children }) {
     }
     return false;
   };
-  const addProductToCart = (id, qty, isModal = true) => {
-    if (!isAddedToCartProducts(id)) {
+  // Accepts a product object with id/title/price/imgSrc.
+  // All callers must pass the full product object, not just an ID.
+  const addProductToCart = (product, qty, isModal = true) => {
+    if (!product || typeof product !== "object" || !product.id) return;
+
+    if (!isAddedToCartProducts(product.id)) {
       const item = {
-        ...allProducts.filter((elm) => elm.id == id)[0],
+        ...product,
         quantity: qty ? qty : 1,
       };
       setCartProducts((pre) => [...pre, item]);

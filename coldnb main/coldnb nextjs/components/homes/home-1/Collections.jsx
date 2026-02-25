@@ -1,18 +1,31 @@
 "use client";
 
-import { collections } from "@/data/collections";
+import { collections as staticCollections } from "@/data/collections";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navigation, Pagination } from "swiper/modules";
-export default function Collections() {
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
+export default function Collections({ data }) {
+  const { t } = useLanguage();
+  const items = data && data.length > 0
+    ? data.map((cat) => ({
+        imgSrc: cat.image_url || "/images/collections/collection-circle/cls-circle1.jpg",
+        alt: cat.name,
+        title: cat.name,
+        count: `${cat.product_count || 0} ${t("homepage.items")}`,
+        slug: cat.slug,
+      }))
+    : staticCollections;
+
   return (
     <section className="flat-spacing-2 pb_0">
       <div className="container">
         <div className="heading-section-2 wow fadeInUp">
-          <h3>Categories you might like</h3>
+          <h3>{t("homepage.categoriesYouMightLike")}</h3>
           <Link href={`/shop-collection`} className="btn-line">
-            View All Collection
+            {t("homepage.viewAllCollection")}
           </Link>
         </div>
         <div
@@ -40,10 +53,10 @@ export default function Collections() {
               nextEl: ".snbn12",
             }}
           >
-            {collections.map((collection, index) => (
+            {items.map((collection, index) => (
               <SwiperSlide key={index}>
                 <div className="collection-circle hover-img">
-                  <Link href={`/shop-collection`} className="img-style">
+                  <Link href={collection.slug ? `/shop-collection?category=${collection.slug}` : `/shop-collection`} className="img-style" style={{ display: 'block', aspectRatio: '1', borderRadius: '50%', overflow: 'hidden' }}>
                     <Image
                       className="lazyload"
                       data-src={collection.imgSrc}
@@ -51,11 +64,12 @@ export default function Collections() {
                       src={collection.imgSrc}
                       width={363}
                       height={363}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </Link>
                   <div className="collection-content text-center">
                     <div>
-                      <Link href={`/shop-collection`} className="cls-title">
+                      <Link href={collection.slug ? `/shop-collection?category=${collection.slug}` : `/shop-collection`} className="cls-title">
                         <h6 className="text">{collection.title}</h6>
                         <i className="icon icon-arrowUpRight" />
                       </Link>

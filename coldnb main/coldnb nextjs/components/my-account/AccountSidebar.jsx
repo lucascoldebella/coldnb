@@ -3,8 +3,14 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { useUserAuth } from "@/context/UserAuthContext";
+
 export default function AccountSidebar() {
+  const { t } = useLanguage();
+  const { profile, signOut } = useUserAuth();
   const pathname = usePathname();
+
   return (
     <div className="wrap-sidebar-account">
       <div className="sidebar-account">
@@ -12,13 +18,13 @@ export default function AccountSidebar() {
           <div className="image">
             <Image
               alt=""
-              src="/images/avatar/user-account.jpg"
+              src={profile?.avatar_url || "/images/avatar/user-account.jpg"}
               width={281}
               height={280}
             />
           </div>
-          <h6 className="mb_4">Tony Nguyen</h6>
-          <div className="body-text-1">themesflat@gmail.com</div>
+          <h6 className="mb_4">{profile?.full_name || t("account.myAccount")}</h6>
+          <div className="body-text-1">{profile?.email || ""}</div>
         </div>
         <ul className="my-account-nav">
           <li>
@@ -50,7 +56,7 @@ export default function AccountSidebar() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Account Details
+              {t("account.accountDetails")}
             </Link>
           </li>
           <li>
@@ -75,7 +81,7 @@ export default function AccountSidebar() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Your Orders
+              {t("account.yourOrders")}
             </Link>
           </li>
           <li>
@@ -107,15 +113,14 @@ export default function AccountSidebar() {
                   strokeLinejoin="round"
                 />
               </svg>
-              My Address
+              {t("account.myAddress")}
             </Link>
           </li>
           <li>
-            <Link
-              href={`/login`}
-              className={`my-account-nav-item ${
-                pathname == "/login" ? "active" : ""
-              } `}
+            <button
+              onClick={signOut}
+              className={`my-account-nav-item`}
+              style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer" }}
             >
               <svg
                 width={24}
@@ -146,8 +151,8 @@ export default function AccountSidebar() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Logout
-            </Link>
+              {t("account.logout")}
+            </button>
           </li>
         </ul>
       </div>

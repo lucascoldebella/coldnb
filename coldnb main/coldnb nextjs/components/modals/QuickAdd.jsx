@@ -1,13 +1,15 @@
 "use client";
 import { useContextElement } from "@/context/Context";
-import { allProducts } from "@/data/products";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import ColorSelect from "../productDetails/ColorSelect";
 import SizeSelect from "../productDetails/SizeSelect";
 import QuantitySelect from "../productDetails/QuantitySelect";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function QuickAdd() {
+  const { t } = useLanguage();
   const [quantity, setQuantity] = useState(1);
   const {
     quickAddItem,
@@ -20,13 +22,13 @@ export default function QuickAdd() {
     cartProducts,
     updateQuantity,
   } = useContextElement();
-  const [item, setItem] = useState(allProducts[0]);
-  useEffect(() => {
-    const filtered = allProducts.filter((el) => el.id == quickAddItem);
-    if (filtered) {
-      setItem(filtered[0]);
-    }
-  }, [quickAddItem]);
+  const router = useRouter();
+
+  // quickAddItem is now a full product object (set by ProductCard)
+  const item = quickAddItem || { id: 0, title: "", price: 0, imgSrc: "/images/products/placeholder.jpg" };
+
+  if (!quickAddItem) return null;
+
   return (
     <div className="modal fade modal-quick-add" id="quickAdd">
       <div className="modal-dialog modal-dialog-centered">
@@ -47,15 +49,15 @@ export default function QuickAdd() {
                   <Link href={`/product-detail/${item.id}`}>{item.title}</Link>
                   <div className="tf-product-info-price">
                     <h5 className="price-on-sale font-2">
-                      ${item.price.toFixed(2)}
+                      R${item.price.toFixed(2)}
                     </h5>
-                    {item.oldPrice ? (
+                    {item.oldPrice && item.oldPrice > item.price ? (
                       <>
                         <div className="compare-at-price font-2">
-                          ${item.oldPrice.toFixed(2)}
+                          R${item.oldPrice.toFixed(2)}
                         </div>
                         <div className="badges-on-sale text-btn-uppercase">
-                          -25%
+                          -{Math.round(((item.oldPrice - item.price) / item.oldPrice) * 100)}%
                         </div>
                       </>
                     ) : (
@@ -68,7 +70,7 @@ export default function QuickAdd() {
                 <ColorSelect />
                 <SizeSelect />
                 <div className="tf-product-info-quantity">
-                  <div className="title mb_12">Quantity:</div>
+                  <div className="title mb_12">{t("product.quantity")}</div>
                   <QuantitySelect
                     quantity={
                       isAddedToCartProducts(item.id)
@@ -89,16 +91,16 @@ export default function QuickAdd() {
                   <div className="tf-product-info-by-btn mb_10">
                     <a
                       className="btn-style-2 flex-grow-1 text-btn-uppercase fw-6 show-shopping-cart"
-                      onClick={() => addProductToCart(item.id, quantity)}
+                      onClick={() => addProductToCart(item, quantity)}
                     >
                       <span>
                         {isAddedToCartProducts(item.id)
-                          ? "Already Added"
-                          : "Add to cart -"}
+                          ? t("product.alreadyAdded")
+                          : t("product.addToCartDash")}
                         &nbsp;
                       </span>
                       <span className="tf-qty-price total-price">
-                        $
+                        R$
                         {isAddedToCartProducts(item.id)
                           ? (
                               item.price *
@@ -119,8 +121,8 @@ export default function QuickAdd() {
                       <span className="tooltip text-caption-2">
                         {" "}
                         {isAddedtoCompareItem(item.id)
-                          ? "Already compared"
-                          : "Compare"}
+                          ? t("product.alreadyCompared")
+                          : t("product.compare")}
                       </span>
                     </a>
                     <a
@@ -130,13 +132,20 @@ export default function QuickAdd() {
                       <span className="icon icon-heart" />
                       <span className="tooltip text-caption-2">
                         {isAddedtoWishlist(item.id)
-                          ? "Already Wishlished"
-                          : "Wishlist"}
+                          ? t("product.alreadyWishlisted")
+                          : t("product.wishlist")}
                       </span>
                     </a>
                   </div>
-                  <a href="#" className="btn-style-3 text-btn-uppercase">
-                    Buy it now
+                  <a
+                    onClick={() => {
+                      addProductToCart(item, quantity);
+                      router.push("/checkout");
+                    }}
+                    className="btn-style-3 text-btn-uppercase"
+                    style={{ cursor: "pointer" }}
+                  >
+                    {t("product.buyItNow")}
                   </a>
                 </div>
               </div>

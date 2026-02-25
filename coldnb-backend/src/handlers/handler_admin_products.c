@@ -15,7 +15,14 @@ void handler_admin_products_register(HttpRouter *router, DbPool *pool) {
     ROUTE_PUT(router, "/api/admin/products/:id", handler_admin_products_update, pool);
     ROUTE_DELETE(router, "/api/admin/products/:id", handler_admin_products_delete, pool);
     ROUTE_POST(router, "/api/admin/products/:id/images", handler_admin_products_add_image, pool);
+    ROUTE_PUT(router, "/api/admin/products/:id/images/:image_id", handler_admin_products_update_image, pool);
     ROUTE_DELETE(router, "/api/admin/products/:id/images/:image_id", handler_admin_products_remove_image, pool);
+
+    /* Category admin CRUD */
+    ROUTE_GET(router, "/api/admin/categories", handler_admin_categories_list, pool);
+    ROUTE_POST(router, "/api/admin/categories", handler_admin_categories_create, pool);
+    ROUTE_PUT(router, "/api/admin/categories/:id", handler_admin_categories_update, pool);
+    ROUTE_DELETE(router, "/api/admin/categories/:id", handler_admin_categories_delete, pool);
 }
 
 void handler_admin_products_list(HttpRequest *req, HttpResponse *resp, void *user_data) {
@@ -231,6 +238,16 @@ void handler_admin_products_create(HttpRequest *req, HttpResponse *resp, void *u
         return;
     }
 
+    /* Validate compare_at_price >= price if set */
+    double v_price = json_get_double(body, "price", 0);
+    double v_compare = json_get_double(body, "compare_at_price", 0);
+    if (v_compare > 0 && v_compare < v_price) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST,
+            "Compare at price must be greater than or equal to price");
+        return;
+    }
+
     /* Generate slug if not provided */
     char *generated_slug = NULL;
     if (str_is_empty(slug)) {
@@ -348,6 +365,18 @@ void handler_admin_products_update(HttpRequest *req, HttpResponse *resp, void *u
     if (body == NULL) {
         http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid JSON");
         return;
+    }
+
+    /* Validate compare_at_price >= price if both are provided */
+    if (cJSON_HasObjectItem(body, "compare_at_price") && cJSON_HasObjectItem(body, "price")) {
+        double up_price = json_get_double(body, "price", 0);
+        double up_compare = json_get_double(body, "compare_at_price", 0);
+        if (up_compare > 0 && up_compare < up_price) {
+            cJSON_Delete(body);
+            http_response_error(resp, HTTP_STATUS_BAD_REQUEST,
+                "Compare at price must be greater than or equal to price");
+            return;
+        }
     }
 
     PGconn *conn = db_pool_acquire(pool);
@@ -645,4 +674,347 @@ void handler_admin_products_remove_image(HttpRequest *req, HttpResponse *resp, v
     db_pool_release(pool, conn);
 
     http_response_no_content(resp);
+}
+
+void handler_admin_products_update_image(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *product_id = http_request_get_path_param(req, "id");
+    const char *image_id = http_request_get_path_param(req, "image_id");
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    if (product_id == NULL || image_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Product ID and Image ID required");
+        return;
+    }
+
+    cJSON *body = json_parse(req->body);
+    if (body == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid JSON");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    /* Check if setting as primary */
+    bool is_primary = json_get_bool(body, "is_primary", false);
+
+    if (!db_begin(conn)) {
+        db_pool_release(pool, conn);
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Transaction failed");
+        return;
+    }
+
+    /* If setting as primary, unset existing primary first */
+    if (is_primary) {
+        const char *unset_query =
+            "UPDATE product_images SET is_primary = false WHERE product_id = $1";
+        const char *unset_params[] = { product_id };
+        PGresult *unset_result = db_exec_params(conn, unset_query, 1, unset_params);
+        if (!db_result_ok(unset_result)) {
+            PQclear(unset_result);
+            db_rollback(conn);
+            db_pool_release(pool, conn);
+            cJSON_Delete(body);
+            http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to update images");
+            return;
+        }
+        PQclear(unset_result);
+    }
+
+    /* Update the specified image */
+    const char *update_query =
+        "UPDATE product_images SET is_primary = $3 "
+        "WHERE id = $1 AND product_id = $2 "
+        "RETURNING id, url, is_primary";
+    const char *params[] = { image_id, product_id, is_primary ? "true" : "false" };
+
+    PGresult *result = db_exec_params(conn, update_query, 3, params);
+    cJSON_Delete(body);
+
+    if (!db_result_ok(result) || !db_result_has_rows(result)) {
+        PQclear(result);
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Image not found");
+        return;
+    }
+
+    db_commit(conn);
+
+    DbRow row = { .result = result, .row = 0 };
+    cJSON *data = db_row_to_json(&row);
+
+    PQclear(result);
+    db_pool_release(pool, conn);
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+
+    LOG_INFO("Product image updated: product=%s, image=%s, is_primary=%s",
+             product_id, image_id, is_primary ? "true" : "false");
+}
+
+/* ── Admin Category CRUD ─────────────────────────────────────────────── */
+
+void handler_admin_categories_list(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    const char *query =
+        "SELECT c.id, c.name, c.slug, c.description, c.image_url, c.parent_id, "
+        "c.is_active, c.sort_order, "
+        "(SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.is_active = true) AS product_count "
+        "FROM categories c ORDER BY c.sort_order, c.name";
+
+    PGresult *result = db_exec(conn, query);
+    db_pool_release(pool, conn);
+
+    if (!db_result_ok(result)) {
+        PQclear(result);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Query failed");
+        return;
+    }
+
+    cJSON *categories = db_result_to_json(result);
+    PQclear(result);
+
+    cJSON *response = json_create_success(categories);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+}
+
+void handler_admin_categories_create(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    cJSON *body = json_parse(req->body);
+    if (body == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid JSON");
+        return;
+    }
+
+    const char *name = json_get_string(body, "name", NULL);
+    if (str_is_empty(name)) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Category name is required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    char parent_str[16];
+    const char *parent_param = NULL;
+    int parent_id = json_get_int(body, "parent_id", 0);
+    if (parent_id > 0) {
+        snprintf(parent_str, sizeof(parent_str), "%d", parent_id);
+        parent_param = parent_str;
+    }
+
+    const char *is_active_str = json_get_bool(body, "is_active", true) ? "true" : "false";
+
+    const char *query =
+        "INSERT INTO categories (name, slug, description, image_url, parent_id, is_active) "
+        "VALUES ($1, $2, $3, $4, $5, $6) "
+        "RETURNING id, name, slug, description, image_url, parent_id, is_active, sort_order";
+
+    const char *params[] = {
+        name,
+        json_get_string(body, "slug", NULL),
+        json_get_string(body, "description", NULL),
+        json_get_string(body, "image_url", NULL),
+        parent_param,
+        is_active_str
+    };
+
+    PGresult *result = db_exec_params(conn, query, 6, params);
+    cJSON_Delete(body);
+    db_pool_release(pool, conn);
+
+    if (!db_result_ok(result) || !db_result_has_rows(result)) {
+        PQclear(result);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to create category");
+        return;
+    }
+
+    DbRow row = { .result = result, .row = 0 };
+    cJSON *data = db_row_to_json(&row);
+    PQclear(result);
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_CREATED, json);
+    free(json);
+
+    LOG_INFO("Category created: %s", name);
+}
+
+void handler_admin_categories_update(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *category_id = http_request_get_path_param(req, "id");
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    if (category_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Category ID required");
+        return;
+    }
+
+    cJSON *body = json_parse(req->body);
+    if (body == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid JSON");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    char parent_str[16];
+    const char *parent_param = NULL;
+    const char *is_active_str = NULL;
+
+    if (cJSON_HasObjectItem(body, "parent_id")) {
+        int parent_id = json_get_int(body, "parent_id", 0);
+        if (parent_id > 0) {
+            snprintf(parent_str, sizeof(parent_str), "%d", parent_id);
+            parent_param = parent_str;
+        }
+    }
+    if (cJSON_HasObjectItem(body, "is_active")) {
+        is_active_str = json_get_bool(body, "is_active", true) ? "true" : "false";
+    }
+
+    const char *query =
+        "UPDATE categories SET "
+        "name = COALESCE($2, name), "
+        "slug = COALESCE($3, slug), "
+        "description = COALESCE($4, description), "
+        "image_url = COALESCE($5, image_url), "
+        "parent_id = COALESCE($6, parent_id), "
+        "is_active = COALESCE($7, is_active), "
+        "updated_at = NOW() "
+        "WHERE id = $1 "
+        "RETURNING id, name, slug, description, image_url, parent_id, is_active, sort_order";
+
+    /* Treat empty string image_url as NULL so COALESCE preserves existing value */
+    const char *image_url_raw = json_get_string(body, "image_url", NULL);
+    const char *image_url_param = (image_url_raw != NULL && image_url_raw[0] != '\0') ? image_url_raw : NULL;
+
+    const char *params[] = {
+        category_id,
+        json_get_string(body, "name", NULL),
+        json_get_string(body, "slug", NULL),
+        json_get_string(body, "description", NULL),
+        image_url_param,
+        parent_param,
+        is_active_str
+    };
+
+    PGresult *result = db_exec_params(conn, query, 7, params);
+    cJSON_Delete(body);
+    db_pool_release(pool, conn);
+
+    if (!db_result_ok(result) || !db_result_has_rows(result)) {
+        PQclear(result);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Category not found");
+        return;
+    }
+
+    DbRow row = { .result = result, .row = 0 };
+    cJSON *data = db_row_to_json(&row);
+    PQclear(result);
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+
+    LOG_INFO("Category updated: %s", category_id);
+}
+
+void handler_admin_categories_delete(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *category_id = http_request_get_path_param(req, "id");
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    if (category_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Category ID required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    /* Soft delete */
+    const char *query =
+        "UPDATE categories SET is_active = false, updated_at = NOW() "
+        "WHERE id = $1 RETURNING id";
+    const char *params[] = { category_id };
+
+    PGresult *result = db_exec_params(conn, query, 1, params);
+    db_pool_release(pool, conn);
+
+    if (!db_result_ok(result) || !db_result_has_rows(result)) {
+        PQclear(result);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Category not found");
+        return;
+    }
+
+    PQclear(result);
+    http_response_no_content(resp);
+
+    LOG_INFO("Category deleted (soft): %s", category_id);
 }

@@ -1,0 +1,77 @@
+// Admin Dashboard Design Tokens
+
+:root {
+  // Primary colors — warm indigo
+  --admin-primary: #4f46e5;
+  --admin-primary-hover: #4338ca;
+  --admin-primary-light: rgba(79, 70, 229, 0.08);
+  --admin-primary-ring: rgba(79, 70, 229, 0.25);
+
+  // Status colors
+  --admin-success: #10b981;
+  --admin-success-light: rgba(16, 185, 129, 0.1);
+  --admin-warning: #f59e0b;
+  --admin-warning-light: rgba(245, 158, 11, 0.1);
+  --admin-danger: #ef4444;
+  --admin-danger-light: rgba(239, 68, 68, 0.1);
+  --admin-info: #3b82f6;
+  --admin-info-light: rgba(59, 130, 246, 0.1);
+
+  // Background & Surface — warmer slate palette
+  --admin-bg: #f8f9fb;
+  --admin-surface: #ffffff;
+  --admin-surface-hover: rgba(0, 0, 0, 0.025);
+
+  // Sidebar — deep navy
+  --admin-sidebar-bg: #0f172a;
+  --admin-sidebar-hover: rgba(255, 255, 255, 0.06);
+  --admin-sidebar-active: rgba(79, 70, 229, 0.15);
+  --admin-sidebar-text: #94a3b8;
+  --admin-sidebar-text-active: #ffffff;
+
+  // Text — warmer grays
+  --admin-text-primary: #1e293b;
+  --admin-text-secondary: #64748b;
+  --admin-text-muted: #94a3b8;
+
+  // Borders
+  --admin-border: #e2e8f0;
+  --admin-border-light: #f1f5f9;
+
+  // Multi-layer shadow system
+  --admin-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --admin-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --admin-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --admin-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --admin-shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.04);
+
+  // Border radius — modern, generous
+  --admin-radius-sm: 8px;
+  --admin-radius: 10px;
+  --admin-radius-lg: 14px;
+  --admin-radius-xl: 18px;
+  --admin-radius-full: 9999px;
+
+  // Spacing
+  --admin-sidebar-width: 260px;
+  --admin-sidebar-collapsed-width: 72px;
+  --admin-header-height: 64px;
+
+  // Transitions — smooth cubic-bezier
+  --admin-transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --admin-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --admin-transition-spring: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+// Dark mode support (optional, for future)
+@media (prefers-color-scheme: dark) {
+  .admin-dark {
+    --admin-bg: #111827;
+    --admin-surface: #1f2937;
+    --admin-surface-hover: #374151;
+    --admin-text-primary: #f9fafb;
+    --admin-text-secondary: #d1d5db;
+    --admin-border: #374151;
+    --admin-border-light: #4b5563;
+  }
+}

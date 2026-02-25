@@ -4,14 +4,16 @@ import { product17 } from "@/data/products";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Shopgram() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing pt-0">
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Shop Instagram</h3>
+          <h3 className="heading">{t("homepage.shopInstagram")}</h3>
           <p className="subheading text-secondary">
-            Elevate your wardrobe with fresh finds today!
+            {t("homepage.instagramDesc")}
           </p>
         </div>
         <Swiper
@@ -55,7 +57,7 @@ export default function Shopgram() {
                   className="box-icon hover-tooltip"
                 >
                   <span className="icon icon-eye" />
-                  <span className="tooltip">View Product</span>
+                  <span className="tooltip">{t("homepage.viewProduct")}</span>
                 </Link>
               </div>
             </SwiperSlide>

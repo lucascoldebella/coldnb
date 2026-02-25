@@ -6,16 +6,17 @@ import Image from "next/image";
 import { Pagination } from "swiper/modules";
 import { testimonialsWithProduct9 } from "@/data/products";
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Testimonials({ parentClass = "flat-spacing" }) {
   const { setQuickViewItem } = useContextElement();
+  const { t } = useLanguage();
   return (
     <section className={parentClass}>
       <div className="container">
         <div className="heading-section text-center">
-          <h3 className="heading wow fadeInUp">Customer Say!</h3>
+          <h3 className="heading wow fadeInUp">{t("homepage.customerSay")}</h3>
           <p className="subheading wow fadeInUp">
-            Our customers adore our products, and we constantly aim to delight
-            them.
+            {t("homepage.customerDesc")}
           </p>
         </div>
         <div className="swiper tf-sw-testimonial">
@@ -64,7 +65,7 @@ export default function Testimonials({ parentClass = "flat-spacing" }) {
                       className="box-icon hover-tooltip center"
                     >
                       <span className="icon icon-eye" />
-                      <span className="tooltip">Quick View</span>
+                      <span className="tooltip">{t("product.quickView")}</span>
                     </a>
                   </div>
                   <div className="content">

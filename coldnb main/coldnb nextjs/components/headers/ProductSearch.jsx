@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ProductSearch() {
-  const [selectedOption, setSelectedOption] = useState("All");
+  const { t } = useLanguage();
+  const [selectedOption, setSelectedOption] = useState(t("shop.all"));
 
   const handleSelect = (value) => {
     setSelectedOption(value);
@@ -17,14 +19,14 @@ export default function ProductSearch() {
           </div>
           <div className="dropdown-menu">
             {[
-              "All",
-              "Best selling",
-              "Alphabetically, A-Z",
-              "Alphabetically, Z-A",
-              "Price, low to high",
-              "Price, high to low",
-              "Date, old to new",
-              "Date, new to old",
+              t("shop.all"),
+              t("shop.bestSelling"),
+              t("shop.alphaAZ"),
+              t("shop.alphaZA"),
+              t("shop.priceLowHigh"),
+              t("shop.priceHighLow"),
+              t("shop.dateOldNew"),
+              t("shop.dateNewOld"),
             ].map((option) => (
               <div
                 key={option}
@@ -38,9 +40,9 @@ export default function ProductSearch() {
             ))}
           </div>
         </div>
-        <input type="text" placeholder="What are you looking for today?" />
+        <input type="text" placeholder={t("shop.searchPlaceholder")} />
         <button className="tf-btn">
-          <span className="text">Search</span>
+          <span className="text">{t("shop.searchButton")}</span>
         </button>
       </div>
     </form>

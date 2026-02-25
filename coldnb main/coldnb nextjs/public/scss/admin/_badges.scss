@@ -1,0 +1,252 @@
+// Admin Badge Styles
+
+.admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--admin-radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border: 1px solid transparent;
+
+  // Default
+  background-color: var(--admin-bg);
+  color: var(--admin-text-secondary);
+  border-color: var(--admin-border-light);
+
+  // Primary
+  &.badge-primary {
+    background-color: var(--admin-primary-light);
+    color: var(--admin-primary);
+    border-color: rgba(79, 70, 229, 0.15);
+  }
+
+  // Success
+  &.badge-success {
+    background-color: var(--admin-success-light);
+    color: #047857;
+    border-color: rgba(16, 185, 129, 0.15);
+  }
+
+  // Warning
+  &.badge-warning {
+    background-color: var(--admin-warning-light);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.15);
+  }
+
+  // Danger
+  &.badge-danger {
+    background-color: var(--admin-danger-light);
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.15);
+  }
+
+  // Info
+  &.badge-info {
+    background-color: var(--admin-info-light);
+    color: #1d4ed8;
+    border-color: rgba(59, 130, 246, 0.15);
+  }
+
+  // Outlined variants
+  &.badge-outline {
+    background-color: transparent;
+    border: 1px solid currentColor;
+  }
+
+  // Dot indicator
+  .badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
+}
+
+// Order Status Badges
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--admin-radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  // Order statuses
+  &.status-pending {
+    background-color: var(--admin-warning-light);
+    color: #b45309;
+
+    .status-dot {
+      background-color: var(--admin-warning);
+    }
+  }
+
+  &.status-processing {
+    background-color: var(--admin-info-light);
+    color: #1d4ed8;
+
+    .status-dot {
+      background-color: var(--admin-info);
+    }
+  }
+
+  &.status-shipped {
+    background-color: #dbeafe;
+    color: #1e40af;
+
+    .status-dot {
+      background-color: #3b82f6;
+    }
+  }
+
+  &.status-delivered {
+    background-color: var(--admin-success-light);
+    color: #047857;
+
+    .status-dot {
+      background-color: var(--admin-success);
+    }
+  }
+
+  &.status-cancelled {
+    background-color: var(--admin-danger-light);
+    color: #b91c1c;
+
+    .status-dot {
+      background-color: var(--admin-danger);
+    }
+  }
+
+  &.status-refunded {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+
+    .status-dot {
+      background-color: #9333ea;
+    }
+  }
+}
+
+// Payment Status Badges
+.payment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--admin-radius);
+  font-size: 12px;
+  font-weight: 500;
+
+  &.payment-paid {
+    background-color: var(--admin-success-light);
+    color: #047857;
+  }
+
+  &.payment-pending {
+    background-color: var(--admin-warning-light);
+    color: #b45309;
+  }
+
+  &.payment-failed {
+    background-color: var(--admin-danger-light);
+    color: #b91c1c;
+  }
+
+  &.payment-refunded {
+    background-color: #f3e8ff;
+    color: #6b21a8;
+  }
+}
+
+// Stock Badge
+.stock-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--admin-radius-full);
+  font-size: 12px;
+  font-weight: 500;
+
+  &.stock-in {
+    background-color: var(--admin-success-light);
+    color: #047857;
+  }
+
+  &.stock-low {
+    background-color: var(--admin-warning-light);
+    color: #b45309;
+  }
+
+  &.stock-out {
+    background-color: var(--admin-danger-light);
+    color: #b91c1c;
+  }
+}
+
+// Role Badge
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--admin-radius);
+  font-size: 12px;
+  font-weight: 600;
+
+  &.role-super_admin {
+    background-color: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+  }
+
+  &.role-admin {
+    background-color: var(--admin-primary-light);
+    color: var(--admin-primary);
+  }
+}
+
+// Interactive badges (clickable)
+.badge-clickable {
+  cursor: pointer;
+  transition: all var(--admin-transition-fast);
+
+  &:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+// Badge group
+.badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// Count badge (for notifications, etc.)
+.count-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  background-color: var(--admin-danger);
+  color: white;
+  border-radius: var(--admin-radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}

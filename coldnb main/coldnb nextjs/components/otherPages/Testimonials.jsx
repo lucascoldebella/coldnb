@@ -3,13 +3,15 @@
 import { testimonials6 } from "@/data/testimonials";
 import { Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Testimonials() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Customer Review</h3>
+          <h3 className="heading">{t("homepage.customerReview")}</h3>
         </div>
         <Swiper
           className="tf-sw-testimonial wow fadeInUp"

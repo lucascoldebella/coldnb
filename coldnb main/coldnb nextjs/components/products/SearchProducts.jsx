@@ -1,12 +1,22 @@
 "use client";
-import { products } from "@/data/products";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 import ProductCard1 from "../productCards/ProductCard1";
 import Link from "next/link";
+import { getProducts } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function SearchProducts() {
+  const { t } = useLanguage();
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    getProducts({ per_page: 4 })
+      .then((res) => setProducts(res.products || []))
+      .catch(() => {});
+  }, []);
+
   return (
     <>
       {/* search */}
@@ -21,7 +31,7 @@ export default function SearchProducts() {
                 <fieldset className="text">
                   <input
                     type="text"
-                    placeholder="Searching..."
+                    placeholder={t("search.searching")}
                     className=""
                     name="text"
                     tabIndex={0}
@@ -57,57 +67,48 @@ export default function SearchProducts() {
                 </button>
               </form>
               <div className="tf-col-quicklink">
-                <span className="title">Quick link:</span>
+                <span className="title">{t("shop.quickLink")}</span>
                 <Link className="link" href={`/shop-default-grid`}>
-                  Fashion
+                  {t("blog.fashion")}
                 </Link>
-                ,
-                <Link className="link" href={`/shop-default-grid`}>
-                  Men
-                </Link>
-                ,
-                <Link className="link" href={`/shop-default-grid`}>
-                  Women
-                </Link>
-                ,
               </div>
             </div>
           </div>
         </div>
       </section>
-      {/* /search */}
       {/* Top pick */}
-      <section className="flat-spacing pt-0">
-        <div className="container">
-          <div className="heading-section text-center wow fadeInUp">
-            <h3 className="heading">Product Recent</h3>
+      {products.length > 0 && (
+        <section className="flat-spacing pt-0">
+          <div className="container">
+            <div className="heading-section text-center wow fadeInUp">
+              <h3 className="heading">{t("shop.productRecent")}</h3>
+            </div>
+            <Swiper
+              className="swiper tf-sw-latest"
+              dir="ltr"
+              spaceBetween={15}
+              breakpoints={{
+                0: { slidesPerView: 2, spaceBetween: 15 },
+                768: { slidesPerView: 3, spaceBetween: 30 },
+                1200: { slidesPerView: 4, spaceBetween: 30 },
+              }}
+              modules={[Pagination]}
+              pagination={{
+                clickable: true,
+                el: ".spd4",
+              }}
+            >
+              {products.map((product, i) => (
+                <SwiperSlide key={product.id || i} className="swiper-slide">
+                  <ProductCard1 product={product} />
+                </SwiperSlide>
+              ))}
+
+              <div className="sw-pagination-latest spd4 sw-dots type-circle justify-content-center" />
+            </Swiper>
           </div>
-          <Swiper
-            className="swiper tf-sw-latest"
-            dir="ltr"
-            spaceBetween={15}
-            breakpoints={{
-              0: { slidesPerView: 2, spaceBetween: 15 },
-
-              768: { slidesPerView: 3, spaceBetween: 30 },
-              1200: { slidesPerView: 4, spaceBetween: 30 },
-            }}
-            modules={[Pagination]}
-            pagination={{
-              clickable: true,
-              el: ".spd4",
-            }}
-          >
-            {products.slice(0, 4).map((product, i) => (
-              <SwiperSlide key={i} className="swiper-slide">
-                <ProductCard1 product={product} />
-              </SwiperSlide>
-            ))}
-
-            <div className="sw-pagination-latest spd4  sw-dots type-circle justify-content-center" />
-          </Swiper>
-        </div>
-      </section>
+        </section>
+      )}
     </>
   );
 }

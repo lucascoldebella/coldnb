@@ -1,12 +1,15 @@
 import React from "react";
 import Image from "next/image";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 export default function Description() {
+  const { t } = useLanguage();
   return (
     <>
       {" "}
       <div className="right">
         <div className="letter-1 text-btn-uppercase mb_12">
-          Stretch strap top
+          {t("productDescription.stretchStrapTop")}
         </div>
         <p className="mb_12 text-secondary">
           Nodding to retro styles, this Hyperbola T-shirt is defined by its
@@ -21,7 +24,7 @@ export default function Description() {
       </div>
       <div className="left">
         <div className="letter-1 text-btn-uppercase mb_12">
-          COMPOSITION, ORIGIN AND CARE GUIDELINES
+          {t("productDescription.composition")}
         </div>
         <ul className="list-text type-disc mb_12 gap-6">
           <li className="font-2">
@@ -214,7 +217,7 @@ export default function Description() {
           </div>
         </div>
         <div className="text-caption-2">
-          MACHINE WASHING MAX 30°C / 85ºF SHORT SPIN DRY
+          {t("productDescription.machineWashing")}
         </div>
       </div>
     </>

@@ -1,7 +1,11 @@
 "use client";
+import Image from "next/image";
+import Link from "next/link";
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function BannerTabProduct({ product }) {
   const { setQuickViewItem } = useContextElement();
+  const { t } = useLanguage();
   return (
     <div className="collection-position-2 hover-img">
       <a className="img-style">
@@ -35,7 +39,7 @@ export default function BannerTabProduct({ product }) {
           data-bs-toggle="modal"
           className="cls-btn text-btn-uppercase"
         >
-          Quick View
+          {t("product.quickView")}
         </a>
       </div>
     </div>

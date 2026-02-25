@@ -5,6 +5,7 @@ import Link from "next/link";
 import CountdownTimer from "../common/Countdown";
 
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function ProductsCards6({ product }) {
   const [currentImage, setCurrentImage] = useState(product.imgSrc);
 
@@ -18,6 +19,8 @@ export default function ProductsCards6({ product }) {
     addProductToCart,
     isAddedToCartProducts,
   } = useContextElement();
+
+  const { t } = useLanguage();
 
   useEffect(() => {
     setCurrentImage(product.imgSrc);
@@ -62,9 +65,7 @@ export default function ProductsCards6({ product }) {
           ${product.price?.toFixed(2)}
         </span>
         <p className="description text-secondary text-line-clamp-2">
-          The garments labelled as Committed are products that have been
-          produced using sustainable fibres or processes, reducing their
-          environmental impact.
+          {t("product.sustainableDesc")}
         </p>
         <div className="variant-wrap-list">
           {product.colors && (
@@ -100,12 +101,12 @@ export default function ProductsCards6({ product }) {
           )}
           <div className="list-product-btn">
             <a
-              onClick={() => addProductToCart(product.id)}
+              onClick={() => addProductToCart(product)}
               className="btn-main-product"
             >
               {isAddedToCartProducts(product.id)
-                ? "Already Added"
-                : "Add To cart"}
+                ? t("product.alreadyAdded")
+                : t("cart.addToCart")}
             </a>
             <a
               onClick={() => addToWishlist(product.id)}
@@ -114,8 +115,8 @@ export default function ProductsCards6({ product }) {
               <span className="icon icon-heart" />
               <span className="tooltip">
                 {isAddedtoWishlist(product.id)
-                  ? "Already Wishlished"
-                  : "Wishlist"}
+                  ? t("product.alreadyWishlisted")
+                  : t("product.wishlist")}
               </span>
             </a>
             <a
@@ -129,8 +130,8 @@ export default function ProductsCards6({ product }) {
               <span className="tooltip">
                 {" "}
                 {isAddedtoCompareItem(product.id)
-                  ? "Already compared"
-                  : "Compare"}
+                  ? t("product.alreadyCompared")
+                  : t("product.compare")}
               </span>
             </a>
             <a
@@ -140,7 +141,7 @@ export default function ProductsCards6({ product }) {
               className="box-icon quickview tf-btn-loading"
             >
               <span className="icon icon-eye" />
-              <span className="tooltip">Quick View</span>
+              <span className="tooltip">{t("product.quickView")}</span>
             </a>
           </div>
         </div>

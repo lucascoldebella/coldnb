@@ -3,8 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import React from "react";
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function LookbookProduct({ product, styleClass = "style-row" }) {
   const { setQuickViewItem } = useContextElement();
+  const { t } = useLanguage();
   return (
     <div className={`loobook-product ${styleClass} `}>
       <div className="img-style">
@@ -26,7 +28,7 @@ export default function LookbookProduct({ product, styleClass = "style-row" }) {
           data-bs-toggle="modal"
           className="btn-lookbook btn-line"
         >
-          Quick View
+          {t("product.quickView")}
         </a>
       </div>
     </div>

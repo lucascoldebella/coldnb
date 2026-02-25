@@ -3,13 +3,24 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useContextElement } from "@/context/Context";
-import { allProducts } from "@/data/products";
+import { getProductsByIds } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Compare() {
+  const { t } = useLanguage();
   const { removeFromCompareItem, compareItem, setCompareItem } =
     useContextElement();
   const [items, setItems] = useState([]);
+
   useEffect(() => {
-    setItems([...allProducts.filter((elm) => compareItem.includes(elm.id))]);
+    if (compareItem.length === 0) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    getProductsByIds(compareItem).then((products) => {
+      if (!cancelled) setItems(products);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [compareItem]);
 
   return (
@@ -29,8 +40,7 @@ export default function Compare() {
                 <div className="tf-compare-list list-file-delete">
                   <div className="tf-compare-head">
                     <h5 className="title">
-                      Compare <br />
-                      Products
+                      {t("comparePage.title")}
                     </h5>
                   </div>
                   {items.length ? (
@@ -114,7 +124,7 @@ export default function Compare() {
                               </Link>
                             </div>
                             <div className="text-button">
-                              ${elm.price.toFixed(2)}
+                              R${elm.price.toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -122,8 +132,7 @@ export default function Compare() {
                     </div>
                   ) : (
                     <div>
-                      No items added to compare yet. Browse Products to find
-                      items you’d like to compare.
+                      {t("comparePage.empty")}
                     </div>
                   )}
                   <div className="tf-compare-buttons">
@@ -133,7 +142,7 @@ export default function Compare() {
                         className="tf-btn w-100 btn-fill radius-4"
                       >
                         <span className="text text-btn-uppercase">
-                          Compare Products
+                          {t("comparePage.title")}
                         </span>
                       </Link>
                       <div
@@ -141,7 +150,7 @@ export default function Compare() {
                         className="tf-compapre-button-clear-all clear-file-delete tf-btn w-100 btn-white radius-4 has-border"
                       >
                         <span className="text text-btn-uppercase">
-                          Clear All Products
+                          {t("comparePage.clearAll")}
                         </span>
                       </div>
                     </div>

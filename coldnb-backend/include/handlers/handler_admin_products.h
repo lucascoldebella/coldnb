@@ -30,4 +30,19 @@ void handler_admin_products_add_image(HttpRequest *req, HttpResponse *resp, void
 /* DELETE /api/admin/products/:id/images/:image_id - Remove product image */
 void handler_admin_products_remove_image(HttpRequest *req, HttpResponse *resp, void *user_data);
 
+/* PUT /api/admin/products/:id/images/:image_id - Update product image (set primary, etc.) */
+void handler_admin_products_update_image(HttpRequest *req, HttpResponse *resp, void *user_data);
+
+/* GET /api/admin/categories - List all categories (including inactive) */
+void handler_admin_categories_list(HttpRequest *req, HttpResponse *resp, void *user_data);
+
+/* POST /api/admin/categories - Create category */
+void handler_admin_categories_create(HttpRequest *req, HttpResponse *resp, void *user_data);
+
+/* PUT /api/admin/categories/:id - Update category (including image_url) */
+void handler_admin_categories_update(HttpRequest *req, HttpResponse *resp, void *user_data);
+
+/* DELETE /api/admin/categories/:id - Soft delete category */
+void handler_admin_categories_delete(HttpRequest *req, HttpResponse *resp, void *user_data);
+
 #endif /* COLDNB_HANDLER_ADMIN_PRODUCTS_H */

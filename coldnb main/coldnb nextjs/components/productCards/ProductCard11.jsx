@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import CountdownTimer from "../common/Countdown";
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function ProductCard11({ product, gridClass = "" }) {
   const [currentImage, setCurrentImage] = useState(product.imgSrc);
 
@@ -17,6 +18,8 @@ export default function ProductCard11({ product, gridClass = "" }) {
     addProductToCart,
     isAddedToCartProducts,
   } = useContextElement();
+
+  const { t } = useLanguage();
 
   useEffect(() => {
     setCurrentImage(product.imgSrc);
@@ -52,7 +55,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
               <div className="initial-child-container">
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -60,7 +63,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -68,7 +71,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -76,7 +79,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -84,7 +87,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -96,7 +99,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
               <div className="initial-child-container">
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -104,7 +107,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -112,7 +115,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -120,7 +123,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -128,7 +131,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -182,8 +185,8 @@ export default function ProductCard11({ product, gridClass = "" }) {
             <span className="icon icon-heart" />
             <span className="tooltip">
               {isAddedtoWishlist(product.id)
-                ? "Already Wishlished"
-                : "Wishlist"}
+                ? t("product.alreadyWishlisted")
+                : t("product.wishlist")}
             </span>
           </a>
           <a
@@ -197,8 +200,8 @@ export default function ProductCard11({ product, gridClass = "" }) {
             <span className="tooltip">
               {" "}
               {isAddedtoCompareItem(product.id)
-                ? "Already compared"
-                : "Compare"}
+                ? t("product.alreadyCompared")
+                : t("product.compare")}
             </span>
           </a>
           <a
@@ -208,7 +211,7 @@ export default function ProductCard11({ product, gridClass = "" }) {
             className="box-icon quickview tf-btn-loading"
           >
             <span className="icon icon-eye" />
-            <span className="tooltip">Quick View</span>
+            <span className="tooltip">{t("product.quickView")}</span>
           </a>
         </div>
       </div>
@@ -246,9 +249,9 @@ export default function ProductCard11({ product, gridClass = "" }) {
         )}
         <a
           className="btn-main-product"
-          onClick={() => addProductToCart(product.id)}
+          onClick={() => addProductToCart(product)}
         >
-          {isAddedToCartProducts(product.id) ? "Already Added" : "ADD TO CART"}
+          {isAddedToCartProducts(product.id) ? t("product.alreadyAdded") : t("product.addToCart")}
         </a>
       </div>
     </div>

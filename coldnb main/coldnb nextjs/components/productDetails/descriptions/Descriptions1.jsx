@@ -2,11 +2,13 @@
 import React, { useState } from "react";
 import Description from "./Description";
 import Reviews from "./Reviews";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 import Shipping from "./Shipping";
 import ReturnPolicies from "./ReturnPolicies";
 
 export default function Descriptions1() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(1);
   return (
     <section className="">
@@ -19,25 +21,25 @@ export default function Descriptions1() {
                   className={`item-title ${activeTab == 1 ? "active" : ""} `}
                   onClick={() => setActiveTab(1)}
                 >
-                  <span className="inner">Description</span>
+                  <span className="inner">{t("product.description")}</span>
                 </li>
                 <li
                   className={`item-title ${activeTab == 2 ? "active" : ""} `}
                   onClick={() => setActiveTab(2)}
                 >
-                  <span className="inner">Customer Reviews</span>
+                  <span className="inner">{t("product.customerReviews")}</span>
                 </li>
                 <li
                   className={`item-title ${activeTab == 3 ? "active" : ""} `}
                   onClick={() => setActiveTab(3)}
                 >
-                  <span className="inner">Shipping &amp; Returns</span>
+                  <span className="inner">{t("product.shippingReturns")}</span>
                 </li>
                 <li
                   className={`item-title ${activeTab == 4 ? "active" : ""} `}
                   onClick={() => setActiveTab(4)}
                 >
-                  <span className="inner">Return Policies</span>
+                  <span className="inner">{t("product.returnPolicies")}</span>
                 </li>
               </ul>
               <div className="widget-content-tab">

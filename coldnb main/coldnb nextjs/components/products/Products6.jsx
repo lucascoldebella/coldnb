@@ -7,7 +7,7 @@ import Listview from "./Listview";
 import { useEffect, useReducer, useState } from "react";
 import FilterModal from "./FilterModal";
 import { initialState, reducer } from "@/reducer/filterReducer";
-import { productMain } from "@/data/products";
+import { getProducts } from "@/lib/shopApi";
 import FilterMeta from "./FilterMeta";
 
 import Pagination from "../common/Pagination";
@@ -31,6 +31,12 @@ export default function Products6() {
     currentPage,
     itemPerPage,
   } = state;
+
+  const [apiProducts, setApiProducts] = useState([]);
+
+  useEffect(() => {
+    getProducts({ per_page: 12 }).then((res) => setApiProducts(res.products || [])).catch(() => {});
+  }, []);
 
   const allProps = {
     ...state,
@@ -72,6 +78,12 @@ export default function Products6() {
       dispatch({ type: "SET_CURRENT_PAGE", payload: 1 }),
         dispatch({ type: "SET_ITEM_PER_PAGE", payload: value });
     },
+    setCategory: (value) => {
+      dispatch({
+        type: "SET_CATEGORY",
+        payload: value === state.category ? null : value,
+      });
+    },
     clearFilter: () => {
       dispatch({ type: "CLEAR_FILTER" });
     },
@@ -81,44 +93,44 @@ export default function Products6() {
     let filteredArrays = [];
 
     if (brands.length) {
-      const filteredByBrands = [...productMain].filter((elm) =>
-        brands.every((el) => elm.filterBrands.includes(el))
+      const filteredByBrands = [...apiProducts].filter((elm) =>
+        brands.every((el) => (elm.filterBrands || []).includes(el))
       );
       filteredArrays = [...filteredArrays, filteredByBrands];
     }
     if (availability !== "All") {
-      const filteredByavailability = [...productMain].filter(
+      const filteredByavailability = [...apiProducts].filter(
         (elm) => availability.value === elm.inStock
       );
       filteredArrays = [...filteredArrays, filteredByavailability];
     }
     if (color !== "All") {
-      const filteredByColor = [...productMain].filter((elm) =>
-        elm.filterColor.includes(color.name)
+      const filteredByColor = [...apiProducts].filter((elm) =>
+        (elm.filterColor || []).includes(color.name)
       );
       filteredArrays = [...filteredArrays, filteredByColor];
     }
     if (size !== "All" && size !== "Free Size") {
-      const filteredBysize = [...productMain].filter((elm) =>
-        elm.filterSizes.includes(size)
+      const filteredBysize = [...apiProducts].filter((elm) =>
+        (elm.filterSizes || []).includes(size)
       );
       filteredArrays = [...filteredArrays, filteredBysize];
     }
     if (activeFilterOnSale) {
-      const filteredByonSale = [...productMain].filter((elm) => elm.oldPrice);
+      const filteredByonSale = [...apiProducts].filter((elm) => elm.oldPrice);
       filteredArrays = [...filteredArrays, filteredByonSale];
     }
 
-    const filteredByPrice = [...productMain].filter(
+    const filteredByPrice = [...apiProducts].filter(
       (elm) => elm.price >= price[0] && elm.price <= price[1]
     );
     filteredArrays = [...filteredArrays, filteredByPrice];
 
-    const commonItems = [...productMain].filter((item) =>
+    const commonItems = [...apiProducts].filter((item) =>
       filteredArrays.every((array) => array.includes(item))
     );
     dispatch({ type: "SET_FILTERED", payload: commonItems });
-  }, [price, availability, color, size, brands, activeFilterOnSale]);
+  }, [price, availability, color, size, brands, activeFilterOnSale, apiProducts]);
 
   useEffect(() => {
     if (sortingOption === "Price Ascending") {

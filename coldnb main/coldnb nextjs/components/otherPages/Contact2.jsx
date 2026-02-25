@@ -1,7 +1,9 @@
 "use client";
 import React, { useRef, useState } from "react";
 import emailjs from "@emailjs/browser";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Contact2() {
+  const { t } = useLanguage();
   const formRef = useRef();
   const [success, setSuccess] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
@@ -39,9 +41,9 @@ export default function Contact2() {
       <div className="container">
         <div className="contact-us-content">
           <div className="left">
-            <h4>Get In Touch</h4>
+            <h4>{t("contact.getInTouch")}</h4>
             <p className="text-secondary-2">
-              Use the form below to get in touch with the sales team
+              {t("contact.subtitle")}
             </p>
             <div
               className={`tfSubscribeMsg  footer-sub-element ${
@@ -50,10 +52,10 @@ export default function Contact2() {
             >
               {success ? (
                 <p style={{ color: "rgb(52, 168, 83)" }}>
-                  You have successfully subscribed.
+                  {t("contact.messageSent")}
                 </p>
               ) : (
-                <p style={{ color: "red" }}>Something went wrong</p>
+                <p style={{ color: "red" }}>{t("contact.somethingWrong")}</p>
               )}
             </div>
             <form
@@ -68,7 +70,7 @@ export default function Contact2() {
                     <input
                       className=""
                       type="text"
-                      placeholder="Your Name*"
+                      placeholder={t("contact.yourName")}
                       name="name"
                       id="name"
                       tabIndex={2}
@@ -81,7 +83,7 @@ export default function Contact2() {
                     <input
                       className=""
                       type="email"
-                      placeholder="Your Email*"
+                      placeholder={t("contact.yourEmail")}
                       name="email"
                       id="email"
                       tabIndex={2}
@@ -96,7 +98,7 @@ export default function Contact2() {
                     name="message"
                     id="message"
                     rows={4}
-                    placeholder="Your Message*"
+                    placeholder={t("contact.yourMessage")}
                     tabIndex={2}
                     aria-required="true"
                     required
@@ -106,36 +108,36 @@ export default function Contact2() {
               </div>
               <div className="button-submit send-wrap">
                 <button className="tf-btn btn-fill" type="submit">
-                  <span className="text text-button">Send message</span>
+                  <span className="text text-button">{t("contact.sendMessage")}</span>
                 </button>
               </div>
             </form>
           </div>
           <div className="right">
-            <h4>Information</h4>
+            <h4>{t("contact.information")}</h4>
             <div className="mb_20">
-              <div className="text-title mb_8">Phone:</div>
+              <div className="text-title mb_8">{t("contact.phoneLabel")}</div>
               <p className="text-secondary">+1 666 234 8888</p>
             </div>
             <div className="mb_20">
-              <div className="text-title mb_8">Email:</div>
-              <p className="text-secondary">themesflat@gmail.com</p>
+              <div className="text-title mb_8">{t("contact.emailLabel")}</div>
+              <p className="text-secondary">contato@coldnb.com.br</p>
             </div>
             <div className="mb_20">
-              <div className="text-title mb_8">Address:</div>
+              <div className="text-title mb_8">{t("contact.addressLabel")}</div>
               <p className="text-secondary">
                 2163 Phillips Gap Rd, West Jefferson, North Carolina, United
                 States
               </p>
             </div>
             <div>
-              <div className="text-title mb_8">Open Time:</div>
+              <div className="text-title mb_8">{t("contact.openTime")}</div>
               <p className="mb_4 open-time">
-                <span className="text-secondary">Mon - Sat:</span> 7:30am -
+                <span className="text-secondary">{t("contact.monSat")}</span> 7:30am -
                 8:00pm PST
               </p>
               <p className="open-time">
-                <span className="text-secondary">Sunday:</span> 9:00am - 5:00pm
+                <span className="text-secondary">{t("contact.sunday")}</span> 9:00am - 5:00pm
                 PST
               </p>
             </div>

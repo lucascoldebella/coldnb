@@ -1,8 +1,11 @@
+"use client";
 import Link from "next/link";
 import React from "react";
 import Image from "next/image";
 import { blogPosts6 } from "@/data/blogs";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Sidebar2() {
+  const { t } = useLanguage();
   return (
     <div className="sidebar maxw-360">
       <div className="sidebar-item sidebar-writer">
@@ -22,16 +25,16 @@ export default function Sidebar2() {
                   Shara Miller
                 </a>
               </h6>
-              <p className="text-caption-1">200 Follower</p>
+              <p className="text-caption-1">{"200 " + t("blog.follower")}</p>
             </div>
             <a href="#" className="button-follow text-btn-uppercase link">
-              Follow
+              {t("blog.follow")}
             </a>
           </div>
         </div>
         <div className="writer-content">
           <p>
-            Jessie Nguyen (@Jessie_ng) is a writer who draws. He’s the
+            Shara Miller (@shara_m) is a writer who draws. She’s the
             Bestselling author of “Number of The Year”. Donec vitae tortor
             efficitur, convallis lelobortis elit.
           </p>
@@ -70,7 +73,7 @@ export default function Sidebar2() {
         </div>
       </div>
       <div className="sidebar-item sidebar-relatest-post">
-        <h5 className="sidebar-heading">Relatest Post</h5>
+        <h5 className="sidebar-heading">{t("blog.latestPost")}</h5>
         <div>
           {blogPosts6.slice(3, 8).map((post, i) => (
             <div

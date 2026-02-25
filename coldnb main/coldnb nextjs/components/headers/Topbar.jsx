@@ -1,8 +1,11 @@
+"use client";
 import React from "react";
 import Link from "next/link";
 import LanguageSelect from "../common/LanguageSelect";
-import CurrencySelect from "../common/CurrencySelect";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 export default function Topbar() {
+  const { t } = useLanguage();
   return (
     <div className="tf-topbar bg-main">
       <div className="container">
@@ -15,7 +18,7 @@ export default function Topbar() {
             </li>
             <li>
               <a className="text-caption-1 text-white" href="#">
-                themesflat@gmail.com
+                contato@coldnb.com.br
               </a>
             </li>
             <li>
@@ -23,20 +26,14 @@ export default function Topbar() {
                 className="text-caption-1 text-white text-decoration-underline"
                 href={`/store-list`}
               >
-                Our Store
+                {t("topbar.ourStore")}
               </Link>
             </li>
           </ul>
           <div className="topbar-right d-none d-xl-block">
             <div className="tf-cur justify-content-end">
-              <div className="tf-currencies">
-                <CurrencySelect light topStart />
-              </div>
               <div className="tf-languages position-relative">
-                <LanguageSelect
-                  parentClassName="image-select center style-default type-languages color-white"
-                  topStart={true}
-                />
+                <LanguageSelect light />
               </div>
             </div>
           </div>

@@ -5,16 +5,17 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import { useContextElement } from "@/context/Context";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Testimonials2() {
   const { setQuickViewItem } = useContextElement();
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing-6">
       <div className="container">
         <div className="heading-section text-center">
-          <h3 className="heading wow fadeInUp">Customer Say!</h3>
+          <h3 className="heading wow fadeInUp">{t("homepage.customerSay")}</h3>
           <p className="subheading wow fadeInUp">
-            Our customers adore our products, and we constantly aim to delight
-            them.
+            {t("homepage.customerDesc")}
           </p>
         </div>
         <Swiper
@@ -52,7 +53,7 @@ export default function Testimonials2() {
                     className="box-icon hover-tooltip center"
                   >
                     <span className="icon icon-eye" />
-                    <span className="tooltip">Quick View</span>
+                    <span className="tooltip">{t("product.quickView")}</span>
                   </a>
                 </div>
                 <div className="content">

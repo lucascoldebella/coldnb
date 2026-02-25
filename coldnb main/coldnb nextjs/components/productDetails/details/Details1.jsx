@@ -7,7 +7,11 @@ import QuantitySelect from "../QuantitySelect";
 import Image from "next/image";
 import { useContextElement } from "@/context/Context";
 import ProductStikyBottom from "../ProductStikyBottom";
+import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Details1({ product }) {
+  const { t } = useLanguage();
+  const router = useRouter();
   const [activeColor, setActiveColor] = useState("gray");
   const [quantity, setQuantity] = useState(1);
   const {
@@ -33,6 +37,18 @@ export default function Details1({ product }) {
                   setActiveColor={setActiveColor}
                   activeColor={activeColor}
                   firstItem={product.imgSrc}
+                  slideItems={
+                    product.images && product.images.length > 0
+                      ? product.images.map((img, index) => ({
+                          id: index + 1,
+                          color: "gray",
+                          src: typeof img === "string" ? img : img.url || img.src,
+                          alt: product.title || "",
+                          width: 600,
+                          height: 800,
+                        }))
+                      : undefined
+                  }
                 />
               </div>
             </div>
@@ -44,7 +60,7 @@ export default function Details1({ product }) {
                 <div className="tf-product-info-list other-image-zoom">
                   <div className="tf-product-info-heading">
                     <div className="tf-product-info-name">
-                      <div className="text text-btn-uppercase">Clothing</div>
+                      <div className="text text-btn-uppercase">{t("product.clothing")}</div>
                       <h3 className="name">{product.title}</h3>
                       <div className="sub">
                         <div className="tf-product-info-rate">
@@ -56,7 +72,7 @@ export default function Details1({ product }) {
                             <i className="icon icon-star" />
                           </div>
                           <div className="text text-caption-1">
-                            (134 reviews)
+                            {"(134 " + t("product.reviews") + ")"}
                           </div>
                         </div>
                         <div className="tf-product-info-sold">
@@ -108,7 +124,7 @@ export default function Details1({ product }) {
                     />
                     <SizeSelect />
                     <div className="tf-product-info-quantity">
-                      <div className="title mb_12">Quantity:</div>
+                      <div className="title mb_12">{t("product.quantity")}</div>
                       <QuantitySelect
                         quantity={
                           isAddedToCartProducts(product.id)
@@ -129,13 +145,13 @@ export default function Details1({ product }) {
                     <div>
                       <div className="tf-product-info-by-btn mb_10">
                         <a
-                          onClick={() => addProductToCart(product.id, quantity)}
+                          onClick={() => addProductToCart(product, quantity)}
                           className="btn-style-2 flex-grow-1 text-btn-uppercase fw-6 btn-add-to-cart"
                         >
                           <span>
                             {isAddedToCartProducts(product.id)
-                              ? "Already Added"
-                              : "Add to cart -"}
+                              ? t("product.alreadyAdded")
+                              : t("product.addToCartDash")}
                           </span>
                           <span className="tf-qty-price total-price">
                             $
@@ -159,8 +175,8 @@ export default function Details1({ product }) {
                           <span className="icon icon-gitDiff" />
                           <span className="tooltip text-caption-2">
                             {isAddedtoCompareItem(product.id)
-                              ? "Already compared"
-                              : "Compare"}
+                              ? t("product.alreadyCompared")
+                              : t("product.compare")}
                           </span>
                         </a>
                         <a
@@ -170,13 +186,20 @@ export default function Details1({ product }) {
                           <span className="icon icon-heart" />
                           <span className="tooltip text-caption-2">
                             {isAddedtoWishlist(product.id)
-                              ? "Already Wishlished"
-                              : "Wishlist"}
+                              ? t("product.alreadyWishlisted")
+                              : t("product.wishlist")}
                           </span>
                         </a>
                       </div>
-                      <a href="#" className="btn-style-3 text-btn-uppercase">
-                        Buy it now
+                      <a
+                        onClick={() => {
+                          addProductToCart(product, quantity);
+                          router.push("/checkout");
+                        }}
+                        className="btn-style-3 text-btn-uppercase"
+                        style={{ cursor: "pointer" }}
+                      >
+                        {t("product.buyItNow")}
                       </a>
                     </div>
                     <div className="tf-product-info-help">
@@ -190,7 +213,7 @@ export default function Details1({ product }) {
                             <i className="icon-shipping" />
                           </div>
                           <p className="text-caption-1">
-                            Delivery &amp; Return
+                            {t("product.deliveryReturn")}
                           </p>
                         </a>
                         <a
@@ -201,7 +224,7 @@ export default function Details1({ product }) {
                           <div className="icon">
                             <i className="icon-question" />
                           </div>
-                          <p className="text-caption-1">Ask A Question</p>
+                          <p className="text-caption-1">{t("product.askQuestion")}</p>
                         </a>
                         <a
                           href="#share_social"
@@ -211,7 +234,7 @@ export default function Details1({ product }) {
                           <div className="icon">
                             <i className="icon-share" />
                           </div>
-                          <p className="text-caption-1">Share</p>
+                          <p className="text-caption-1">{t("product.share")}</p>
                         </a>
                       </div>
                       <div className="tf-product-info-time">
@@ -219,8 +242,7 @@ export default function Details1({ product }) {
                           <i className="icon-timer" />
                         </div>
                         <p className="text-caption-1">
-                          Estimated Delivery:&nbsp;&nbsp;<span>12-26 days</span>
-                          (International), <span>3-6 days</span> (United States)
+                          {t("product.estimatedDelivery")}
                         </p>
                       </div>
                       <div className="tf-product-info-return">
@@ -228,8 +250,7 @@ export default function Details1({ product }) {
                           <i className="icon-arrowClockwise" />
                         </div>
                         <p className="text-caption-1">
-                          Return within <span>45 days</span> of purchase. Duties
-                          &amp; taxes are non-refundable.
+                          {t("product.returnPolicyShort")}
                         </p>
                       </div>
                       <div className="dropdown dropdown-store-location">
@@ -248,13 +269,13 @@ export default function Details1({ product }) {
                         <div className="dropdown-menu dropdown-menu-end">
                           <div className="dropdown-content">
                             <div className="dropdown-content-heading">
-                              <h5>Store Location</h5>
+                              <h5>{t("product.storeLocation")}</h5>
                               <i className="icon icon-close" />
                             </div>
                             <div className="line-bt" />
                             <div>
-                              <h6>Fashion ColdnbMain</h6>
-                              <p>Pickup available. Usually ready in 24 hours</p>
+                              <h6>{t("product.storeName")}</h6>
+                              <p>{t("product.pickupAvailable")}</p>
                             </div>
                             <div>
                               <p>766 Rosalinda Forges Suite 044,</p>
@@ -266,36 +287,36 @@ export default function Details1({ product }) {
                     </div>
                     <ul className="tf-product-info-sku">
                       <li>
-                        <p className="text-caption-1">SKU:</p>
+                        <p className="text-caption-1">{t("product.sku")}</p>
                         <p className="text-caption-1 text-1">53453412</p>
                       </li>
                       <li>
-                        <p className="text-caption-1">Vendor:</p>
+                        <p className="text-caption-1">{t("product.vendor")}</p>
                         <p className="text-caption-1 text-1">ColdnbMain</p>
                       </li>
                       <li>
-                        <p className="text-caption-1">Available:</p>
-                        <p className="text-caption-1 text-1">Instock</p>
+                        <p className="text-caption-1">{t("product.availableLabel")}</p>
+                        <p className="text-caption-1 text-1">{t("product.instock")}</p>
                       </li>
                       <li>
-                        <p className="text-caption-1">Categories:</p>
+                        <p className="text-caption-1">{t("product.categoriesLabel")}</p>
                         <p className="text-caption-1">
                           <a href="#" className="text-1 link">
-                            Clothes
+                            {t("product.clothes")}
                           </a>
                           ,
                           <a href="#" className="text-1 link">
-                            women
+                            {t("product.women")}
                           </a>
                           ,
                           <a href="#" className="text-1 link">
-                            T-shirt
+                            {t("product.tshirt")}
                           </a>
                         </p>
                       </li>
                     </ul>
                     <div className="tf-product-info-guranteed">
-                      <div className="text-title">Guranteed safe checkout:</div>
+                      <div className="text-title">{t("product.guaranteedCheckout")}</div>
                       <div className="tf-payment">
                         <a href="#">
                           <Image
@@ -355,7 +376,7 @@ export default function Details1({ product }) {
           </div>
         </div>
       </div>
-      <ProductStikyBottom />
+      <ProductStikyBottom product={product} />
     </section>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 import React, { useRef, useState } from "react";
 import emailjs from "@emailjs/browser";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Contact1() {
+  const { t } = useLanguage();
   const formRef = useRef();
   const [success, setSuccess] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
@@ -38,9 +40,9 @@ export default function Contact1() {
     <section className="flat-spacing pt-0">
       <div className="container">
         <div className="heading-section text-center">
-          <h3 className="heading">Get In Touch</h3>
+          <h3 className="heading">{t("contact.getInTouch")}</h3>
           <p className="subheading">
-            Use the form below to get in touch with the sales team
+            {t("contact.subtitle")}
           </p>
         </div>
         <div
@@ -50,10 +52,10 @@ export default function Contact1() {
         >
           {success ? (
             <p style={{ color: "rgb(52, 168, 83)" }}>
-              Message Sent Successfully
+              {t("contact.messageSent")}
             </p>
           ) : (
-            <p style={{ color: "red" }}>Something went wrong</p>
+            <p style={{ color: "red" }}>{t("contact.somethingWrong")}</p>
           )}
         </div>
         <form onSubmit={sendMail} ref={formRef} className="form-leave-comment">
@@ -63,7 +65,7 @@ export default function Contact1() {
                 <input
                   className=""
                   type="text"
-                  placeholder="Your Name*"
+                  placeholder={t("contact.yourName")}
                   name="text"
                   tabIndex={2}
                   defaultValue=""
@@ -75,7 +77,7 @@ export default function Contact1() {
                 <input
                   className=""
                   type="email"
-                  placeholder="Your Email*"
+                  placeholder={t("contact.yourEmail")}
                   name="email"
                   tabIndex={2}
                   defaultValue=""
@@ -88,7 +90,7 @@ export default function Contact1() {
               <textarea
                 className=""
                 rows={4}
-                placeholder="Your Message*"
+                placeholder={t("contact.yourMessage")}
                 tabIndex={2}
                 aria-required="true"
                 required
@@ -98,7 +100,7 @@ export default function Contact1() {
           </div>
           <div className="button-submit text-center">
             <button className="tf-btn btn-fill" type="submit">
-              <span className="text text-button">Send message</span>
+              <span className="text text-button">{t("contact.sendMessage")}</span>
             </button>
           </div>
         </form>

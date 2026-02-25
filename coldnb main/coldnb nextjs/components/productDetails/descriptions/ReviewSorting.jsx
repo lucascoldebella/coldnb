@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ReviewSorting() {
-  const [selectedOption, setSelectedOption] = useState("Most Recent");
+  const { t } = useLanguage();
+  const [selectedOption, setSelectedOption] = useState(t("reviews.mostRecent"));
 
   const handleSelect = (value) => {
     setSelectedOption(value);
@@ -14,7 +16,7 @@ export default function ReviewSorting() {
         <span className="icon icon-arrow-down" />
       </div>
       <div className="dropdown-menu">
-        {["Most Recent", "Oldest", "Most Popular"].map((option) => (
+        {[t("reviews.mostRecent"), t("reviews.oldest"), t("reviews.mostPopular")].map((option) => (
           <div
             key={option}
             className={`select-item ${

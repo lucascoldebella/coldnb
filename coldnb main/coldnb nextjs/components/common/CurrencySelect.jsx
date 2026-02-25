@@ -10,11 +10,6 @@ const optionsData = [
     text: "USD",
     selected: true,
   },
-  {
-    value: "vn",
-    thumbnail: "/images/country/vn.svg",
-    text: "VND",
-  },
 ];
 export default function CurrencySelect({ topStart = false, light = false }) {
   const [selected, setSelected] = useState(optionsData[0]);

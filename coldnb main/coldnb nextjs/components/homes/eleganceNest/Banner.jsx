@@ -1,7 +1,10 @@
+"use client";
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Banner() {
+  const { t } = useLanguage();
   return (
     <section>
       <div className="container">
@@ -17,16 +20,16 @@ export default function Banner() {
           <div className="banner-content">
             <div className="content-text wow fadeInUp">
               <h3 className="title text-center fw-5">
-                Special Offer! <br />
-                This Week Only
+                {t("homepage.specialOffer")} <br />
+                {t("homepage.thisWeekOnly")}
               </h3>
-              <p className="desc">Reserved for special occasions</p>
+              <p className="desc">{t("homepage.reservedSpecial")}</p>
             </div>
             <Link
               href={`/shop-default-grid`}
               className="tf-btn btn-fill wow fadeInUp"
             >
-              <span className="text">Explore Collection</span>
+              <span className="text">{t("homepage.exploreCollection")}</span>
               <i className="icon icon-arrowUpRight" />
             </Link>
           </div>

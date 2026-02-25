@@ -1,14 +1,16 @@
 "use client";
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Faqs() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="page-faqs-wrap">
           <div className="list-faqs">
             <div>
-              <h5 className="faqs-title">How To Buy</h5>
+              <h5 className="faqs-title">{t("faq.howToBuy")}</h5>
               <ul
                 className="accordion-product-wrap style-faqs"
                 id="accordion-faq-1"
@@ -22,8 +24,7 @@ export default function Faqs() {
                     aria-controls="accordion-1"
                   >
                     <h6>
-                      How does COVID-19 affect my online orders and store
-                      purchases?
+                      {t("faq.q1")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -34,14 +35,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -67,14 +61,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -87,7 +74,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-3"
                   >
-                    <h6>NEW! Plus sizes for Woman</h6>
+                    <h6>{t("faq.q3")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -97,14 +84,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -117,7 +97,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-4"
                   >
-                    <h6>Where is my order?</h6>
+                    <h6>{t("faq.q4")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -127,14 +107,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -148,7 +121,7 @@ export default function Faqs() {
                     aria-controls="accordion-5"
                   >
                     <h6>
-                      How can I exchange or return an item purchased online?
+                      {t("faq.q5")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -159,14 +132,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -174,7 +140,7 @@ export default function Faqs() {
               </ul>
             </div>
             <div>
-              <h5 className="faqs-title">Exchanges &amp; Returns</h5>
+              <h5 className="faqs-title">{t("faq.exchangesReturns")}</h5>
               <ul
                 className="accordion-product-wrap style-faqs"
                 id="accordion-faq-2"
@@ -187,7 +153,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-6"
                   >
-                    <h6>Can I cancel or change my order?</h6>
+                    <h6>{t("faq.q6")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -197,14 +163,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -218,8 +177,7 @@ export default function Faqs() {
                     aria-controls="accordion-7"
                   >
                     <h6>
-                      I have a promotional or discount code. How do I use it for
-                      an online purchase?
+                      {t("faq.q7")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -230,14 +188,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -250,7 +201,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-8"
                   >
-                    <h6>What are the delivery types?</h6>
+                    <h6>{t("faq.q8")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -260,14 +211,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -280,7 +224,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-9"
                   >
-                    <h6>How can I pay for my purchases?</h6>
+                    <h6>{t("faq.q9")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -290,14 +234,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -310,7 +247,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-10"
                   >
-                    <h6>Can I save an item I like?</h6>
+                    <h6>{t("faq.q10")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -320,14 +257,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -335,7 +265,7 @@ export default function Faqs() {
               </ul>
             </div>
             <div>
-              <h5 className="faqs-title">Refund Questions</h5>
+              <h5 className="faqs-title">{t("faq.refundQuestions")}</h5>
               <ul
                 className="accordion-product-wrap style-faqs"
                 id="accordion-faq-3"
@@ -349,8 +279,7 @@ export default function Faqs() {
                     aria-controls="accordion-11"
                   >
                     <h6>
-                      I cannot find my size or the colour I like. What should I
-                      do?
+                      {t("faq.q11")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -361,14 +290,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -382,8 +304,7 @@ export default function Faqs() {
                     aria-controls="accordion-12"
                   >
                     <h6>
-                      I have not received all the items in my order. What should
-                      I do?
+                      {t("faq.q12")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -394,14 +315,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -415,8 +329,7 @@ export default function Faqs() {
                     aria-controls="accordion-13"
                   >
                     <h6>
-                      The items received are incorrect or are defective. What
-                      should I do?
+                      {t("faq.q13")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -427,14 +340,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -448,8 +354,7 @@ export default function Faqs() {
                     aria-controls="accordion-14"
                   >
                     <h6>
-                      Are the items included in the shopping basket reserved
-                      automatically?
+                      {t("faq.q14")}
                     </h6>
                     <span className="btn-open-sub" />
                   </a>
@@ -460,14 +365,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -480,7 +378,7 @@ export default function Faqs() {
                     aria-expanded="true"
                     aria-controls="accordion-15"
                   >
-                    <h6>In which countries can I shop online?</h6>
+                    <h6>{t("faq.q15")}</h6>
                     <span className="btn-open-sub" />
                   </a>
                   <div
@@ -490,14 +388,7 @@ export default function Faqs() {
                   >
                     <div className="accordion-faqs-content">
                       <p className="text-secondary">
-                        The courier companies have adapted their procedures to
-                        guarantee the safety of our employees and our community.
-                        We thank you for your patience, as there may be some
-                        delays to deliveries. We remind you that you can still
-                        find us at Mango.com and on all our online channels. Our
-                        customer services are still there for you, to answer any
-                        questions you may have, although due to the current
-                        situation, we are operating with longer waiting times.
+                        {t("faq.faqAnswer")}
                       </p>
                     </div>
                   </div>
@@ -507,20 +398,20 @@ export default function Faqs() {
           </div>
           <div className="ask-question sticky-top">
             <div className="ask-question-wrap">
-              <h5 className="mb_4">Ask Your Question</h5>
+              <h5 className="mb_4">{t("faq.askYourQuestion")}</h5>
               <p className="mb_20 text-secondary">
-                Ask Anything, We're Here to Help
+                {t("faq.askAnything")}
               </p>
               <form
                 className="form-leave-comment"
                 onSubmit={(e) => e.preventDefault()}
               >
                 <fieldset className="mb_20">
-                  <div className="text-caption-1 mb_8">Name</div>
+                  <div className="text-caption-1 mb_8">{t("faq.name")}</div>
                   <input
                     className=""
                     type="text"
-                    placeholder="Your Name*"
+                    placeholder={t("faq.yourName")}
                     name="text"
                     tabIndex={2}
                     defaultValue=""
@@ -530,21 +421,21 @@ export default function Faqs() {
                 </fieldset>
                 <fieldset className="mb_20">
                   <div className="text-caption-1 mb_8">
-                    How can we help you?
+                    {t("faq.howCanWeHelp")}
                   </div>
                   <div className="tf-select">
                     <select className="">
-                      <option>Exchanges &amp; Returns</option>
-                      <option>Other</option>
+                      <option>{t("faq.exchangesReturns")}</option>
+                      <option>{t("faq.other")}</option>
                     </select>
                   </div>
                 </fieldset>
                 <fieldset className="mb_20">
-                  <div className="text-caption-1 mb_8">Name</div>
+                  <div className="text-caption-1 mb_8">{t("contact.message")}</div>
                   <textarea
                     className=""
                     rows={4}
-                    placeholder="Your Message*"
+                    placeholder={t("faq.yourMessage")}
                     tabIndex={2}
                     aria-required="true"
                     required
@@ -553,7 +444,7 @@ export default function Faqs() {
                 </fieldset>
                 <div className="button-submit">
                   <button className="btn-style-2 w-100" type="submit">
-                    <span className="text text-button">Send Request</span>
+                    <span className="text text-button">{t("faq.sendRequest")}</span>
                   </button>
                 </div>
               </form>

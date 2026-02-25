@@ -1,10 +1,18 @@
 "use client";
 
-import { iconboxItems } from "@/data/features";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 
+const featureIcons = [
+  { id: 1, icon: "icon-return", titleKey: "features.returns14Title", descKey: "features.returns14Desc" },
+  { id: 2, icon: "icon-shipping", titleKey: "features.shippingTitle", descKey: "features.shippingDesc" },
+  { id: 3, icon: "icon-headset", titleKey: "features.supportTitle", descKey: "features.supportDesc" },
+  { id: 4, icon: "icon-sealCheck", titleKey: "features.discountsTitle", descKey: "features.discountsDesc" },
+];
+
 export default function Features({ parentClass = "flat-spacing" }) {
+  const { t } = useLanguage();
   return (
     <section className={parentClass}>
       <div className="container">
@@ -24,15 +32,15 @@ export default function Features({ parentClass = "flat-spacing" }) {
             el: ".spd2",
           }}
         >
-          {iconboxItems.map((item) => (
+          {featureIcons.map((item) => (
             <SwiperSlide key={item.id}>
               <div className="tf-icon-box">
                 <div className="icon-box">
                   <span className={`icon ${item.icon}`} />
                 </div>
                 <div className="content text-center">
-                  <h6>{item.title}</h6>
-                  <p className="text-secondary">{item.description}</p>
+                  <h6>{t(item.titleKey)}</h6>
+                  <p className="text-secondary">{t(item.descKey)}</p>
                 </div>
               </div>
             </SwiperSlide>

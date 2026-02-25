@@ -3,14 +3,16 @@ import Image from "next/image";
 import { collections2 } from "@/data/collections";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Categories() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="heading-section-2 wow fadeInUp">
-          <h3 className="heading">Explore Collections</h3>
+          <h3 className="heading">{t("homepage.exploreCollections")}</h3>
           <Link href={`/shop-collection`} className="btn-line">
-            View All Collection
+            {t("homepage.viewAllCollection")}
           </Link>
         </div>
       </div>

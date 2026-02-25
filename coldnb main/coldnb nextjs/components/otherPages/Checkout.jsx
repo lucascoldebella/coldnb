@@ -1,10 +1,12 @@
 "use client";
 
 import { useContextElement } from "@/context/Context";
+import { calculateShipping } from "@/lib/shopApi";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 const discounts = [
   {
     discount: "10% OFF",
@@ -23,8 +25,47 @@ const discounts = [
   },
 ];
 export default function Checkout() {
+  const { t } = useLanguage();
   const [activeDiscountIndex, setActiveDiscountIndex] = useState(1);
+  const [cep, setCep] = useState("");
+  const [shippingResult, setShippingResult] = useState(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState("");
   const { cartProducts, totalPrice } = useContextElement();
+
+  const shippingPrice = shippingResult ? parseFloat(shippingResult.price) : 0;
+
+  const formatCep = (value) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 5) {
+      return digits.slice(0, 5) + "-" + digits.slice(5);
+    }
+    return digits;
+  };
+
+  const handleCepChange = async (e) => {
+    const formatted = formatCep(e.target.value);
+    setCep(formatted);
+    setShippingError("");
+
+    const digits = formatted.replace(/\D/g, "");
+    if (digits.length === 8) {
+      setShippingLoading(true);
+      setShippingResult(null);
+      try {
+        const result = await calculateShipping(digits);
+        setShippingResult(result);
+      } catch (err) {
+        const errMsg = err.response?.data?.error || err.message || t("checkout.shippingError");
+        setShippingError(typeof errMsg === "string" ? errMsg : t("checkout.shippingError"));
+        setShippingResult(null);
+      } finally {
+        setShippingLoading(false);
+      }
+    } else {
+      setShippingResult(null);
+    }
+  };
   return (
     <section>
       <div className="container">
@@ -33,9 +74,9 @@ export default function Checkout() {
             <div className="flat-spacing tf-page-checkout">
               <div className="wrap">
                 <div className="title-login">
-                  <p>Already have an account?</p>{" "}
+                  <p>{t("checkout.alreadyHaveAccount")}</p>{" "}
                   <Link href={`/login`} className="text-button">
-                    Login here
+                    {t("checkout.loginHere")}
                   </Link>
                 </div>
                 <form
@@ -43,201 +84,95 @@ export default function Checkout() {
                   onSubmit={(e) => e.preventDefault()}
                 >
                   <div className="grid-2">
-                    <input type="text" placeholder="Your name/Email" />
-                    <input type="password" placeholder="Password" />
+                    <input type="text" placeholder={t("checkout.yourNameEmail")} />
+                    <input type="password" placeholder={t("checkout.password")} />
                   </div>
                   <button className="tf-btn" type="submit">
-                    <span className="text">Login</span>
+                    <span className="text">{t("checkout.login")}</span>
                   </button>
                 </form>
               </div>
               <div className="wrap">
-                <h5 className="title">Information</h5>
+                <h5 className="title">{t("checkout.information")}</h5>
                 <form className="info-box" onSubmit={(e) => e.preventDefault()}>
                   <div className="grid-2">
-                    <input type="text" placeholder="First Name*" />
-                    <input type="text" placeholder="Last Name*" />
+                    <input type="text" placeholder={t("checkout.firstName")} />
+                    <input type="text" placeholder={t("checkout.lastName")} />
                   </div>
                   <div className="grid-2">
-                    <input type="text" placeholder="Email Address*" />
-                    <input type="text" placeholder="Phone Number*" />
-                  </div>
-                  <div className="tf-select">
-                    <select
-                      className="text-title"
-                      name="address[country]"
-                      data-default=""
-                    >
-                      <option
-                        selected=""
-                        value="Choose Country/Region"
-                        data-provinces="[]"
-                      >
-                        Choose Country/Region
-                      </option>
-                      <option
-                        value="United States"
-                        data-provinces="[['Alabama','Alabama'],['Alaska','Alaska'],['American Samoa','American Samoa'],['Arizona','Arizona'],['Arkansas','Arkansas'],['Armed Forces Americas','Armed Forces Americas'],['Armed Forces Europe','Armed Forces Europe'],['Armed Forces Pacific','Armed Forces Pacific'],['California','California'],['Colorado','Colorado'],['Connecticut','Connecticut'],['Delaware','Delaware'],['District of Columbia','Washington DC'],['Federated States of Micronesia','Micronesia'],['Florida','Florida'],['Georgia','Georgia'],['Guam','Guam'],['Hawaii','Hawaii'],['Idaho','Idaho'],['Illinois','Illinois'],['Indiana','Indiana'],['Iowa','Iowa'],['Kansas','Kansas'],['Kentucky','Kentucky'],['Louisiana','Louisiana'],['Maine','Maine'],['Marshall Islands','Marshall Islands'],['Maryland','Maryland'],['Massachusetts','Massachusetts'],['Michigan','Michigan'],['Minnesota','Minnesota'],['Mississippi','Mississippi'],['Missouri','Missouri'],['Montana','Montana'],['Nebraska','Nebraska'],['Nevada','Nevada'],['New Hampshire','New Hampshire'],['New Jersey','New Jersey'],['New Mexico','New Mexico'],['New York','New York'],['North Carolina','North Carolina'],['North Dakota','North Dakota'],['Northern Mariana Islands','Northern Mariana Islands'],['Ohio','Ohio'],['Oklahoma','Oklahoma'],['Oregon','Oregon'],['Palau','Palau'],['Pennsylvania','Pennsylvania'],['Puerto Rico','Puerto Rico'],['Rhode Island','Rhode Island'],['South Carolina','South Carolina'],['South Dakota','South Dakota'],['Tennessee','Tennessee'],['Texas','Texas'],['Utah','Utah'],['Vermont','Vermont'],['Virgin Islands','U.S. Virgin Islands'],['Virginia','Virginia'],['Washington','Washington'],['West Virginia','West Virginia'],['Wisconsin','Wisconsin'],['Wyoming','Wyoming']]"
-                      >
-                        United States
-                      </option>
-                      <option
-                        value="Australia"
-                        data-provinces="[['Australian Capital Territory','Australian Capital Territory'],['New South Wales','New South Wales'],['Northern Territory','Northern Territory'],['Queensland','Queensland'],['South Australia','South Australia'],['Tasmania','Tasmania'],['Victoria','Victoria'],['Western Australia','Western Australia']]"
-                      >
-                        Australia
-                      </option>
-                      <option value="Austria" data-provinces="[]">
-                        Austria
-                      </option>
-                      <option value="Belgium" data-provinces="[]">
-                        Belgium
-                      </option>
-                      <option
-                        value="Canada"
-                        data-provinces="[['Alberta','Alberta'],['British Columbia','British Columbia'],['Manitoba','Manitoba'],['New Brunswick','New Brunswick'],['Newfoundland and Labrador','Newfoundland and Labrador'],['Northwest Territories','Northwest Territories'],['Nova Scotia','Nova Scotia'],['Nunavut','Nunavut'],['Ontario','Ontario'],['Prince Edward Island','Prince Edward Island'],['Quebec','Quebec'],['Saskatchewan','Saskatchewan'],['Yukon','Yukon']]"
-                      >
-                        Canada
-                      </option>
-                      <option value="Czech Republic" data-provinces="[]">
-                        Czechia
-                      </option>
-                      <option value="Denmark" data-provinces="[]">
-                        Denmark
-                      </option>
-                      <option value="Finland" data-provinces="[]">
-                        Finland
-                      </option>
-                      <option value="France" data-provinces="[]">
-                        France
-                      </option>
-                      <option value="Germany" data-provinces="[]">
-                        Germany
-                      </option>
-                      <option
-                        value="Hong Kong"
-                        data-provinces="[['Hong Kong Island','Hong Kong Island'],['Kowloon','Kowloon'],['New Territories','New Territories']]"
-                      >
-                        Hong Kong SAR
-                      </option>
-                      <option
-                        value="Ireland"
-                        data-provinces="[['Carlow','Carlow'],['Cavan','Cavan'],['Clare','Clare'],['Cork','Cork'],['Donegal','Donegal'],['Dublin','Dublin'],['Galway','Galway'],['Kerry','Kerry'],['Kildare','Kildare'],['Kilkenny','Kilkenny'],['Laois','Laois'],['Leitrim','Leitrim'],['Limerick','Limerick'],['Longford','Longford'],['Louth','Louth'],['Mayo','Mayo'],['Meath','Meath'],['Monaghan','Monaghan'],['Offaly','Offaly'],['Roscommon','Roscommon'],['Sligo','Sligo'],['Tipperary','Tipperary'],['Waterford','Waterford'],['Westmeath','Westmeath'],['Wexford','Wexford'],['Wicklow','Wicklow']]"
-                      >
-                        Ireland
-                      </option>
-                      <option value="Israel" data-provinces="[]">
-                        Israel
-                      </option>
-                      <option
-                        value="Italy"
-                        data-provinces="[['Agrigento','Agrigento'],['Alessandria','Alessandria'],['Ancona','Ancona'],['Aosta','Aosta Valley'],['Arezzo','Arezzo'],['Ascoli Piceno','Ascoli Piceno'],['Asti','Asti'],['Avellino','Avellino'],['Bari','Bari'],['Barletta-Andria-Trani','Barletta-Andria-Trani'],['Belluno','Belluno'],['Benevento','Benevento'],['Bergamo','Bergamo'],['Biella','Biella'],['Bologna','Bologna'],['Bolzano','South Tyrol'],['Brescia','Brescia'],['Brindisi','Brindisi'],['Cagliari','Cagliari'],['Caltanissetta','Caltanissetta'],['Campobasso','Campobasso'],['Carbonia-Iglesias','Carbonia-Iglesias'],['Caserta','Caserta'],['Catania','Catania'],['Catanzaro','Catanzaro'],['Chieti','Chieti'],['Como','Como'],['Cosenza','Cosenza'],['Cremona','Cremona'],['Crotone','Crotone'],['Cuneo','Cuneo'],['Enna','Enna'],['Fermo','Fermo'],['Ferrara','Ferrara'],['Firenze','Florence'],['Foggia','Foggia'],['Forlì-Cesena','Forlì-Cesena'],['Frosinone','Frosinone'],['Genova','Genoa'],['Gorizia','Gorizia'],['Grosseto','Grosseto'],['Imperia','Imperia'],['Isernia','Isernia'],['L'Aquila','L’Aquila'],['La Spezia','La Spezia'],['Latina','Latina'],['Lecce','Lecce'],['Lecco','Lecco'],['Livorno','Livorno'],['Lodi','Lodi'],['Lucca','Lucca'],['Macerata','Macerata'],['Mantova','Mantua'],['Massa-Carrara','Massa and Carrara'],['Matera','Matera'],['Medio Campidano','Medio Campidano'],['Messina','Messina'],['Milano','Milan'],['Modena','Modena'],['Monza e Brianza','Monza and Brianza'],['Napoli','Naples'],['Novara','Novara'],['Nuoro','Nuoro'],['Ogliastra','Ogliastra'],['Olbia-Tempio','Olbia-Tempio'],['Oristano','Oristano'],['Padova','Padua'],['Palermo','Palermo'],['Parma','Parma'],['Pavia','Pavia'],['Perugia','Perugia'],['Pesaro e Urbino','Pesaro and Urbino'],['Pescara','Pescara'],['Piacenza','Piacenza'],['Pisa','Pisa'],['Pistoia','Pistoia'],['Pordenone','Pordenone'],['Potenza','Potenza'],['Prato','Prato'],['Ragusa','Ragusa'],['Ravenna','Ravenna'],['Reggio Calabria','Reggio Calabria'],['Reggio Emilia','Reggio Emilia'],['Rieti','Rieti'],['Rimini','Rimini'],['Roma','Rome'],['Rovigo','Rovigo'],['Salerno','Salerno'],['Sassari','Sassari'],['Savona','Savona'],['Siena','Siena'],['Siracusa','Syracuse'],['Sondrio','Sondrio'],['Taranto','Taranto'],['Teramo','Teramo'],['Terni','Terni'],['Torino','Turin'],['Trapani','Trapani'],['Trento','Trentino'],['Treviso','Treviso'],['Trieste','Trieste'],['Udine','Udine'],['Varese','Varese'],['Venezia','Venice'],['Verbano-Cusio-Ossola','Verbano-Cusio-Ossola'],['Vercelli','Vercelli'],['Verona','Verona'],['Vibo Valentia','Vibo Valentia'],['Vicenza','Vicenza'],['Viterbo','Viterbo']]"
-                      >
-                        Italy
-                      </option>
-                      <option
-                        value="Japan"
-                        data-provinces="[['Aichi','Aichi'],['Akita','Akita'],['Aomori','Aomori'],['Chiba','Chiba'],['Ehime','Ehime'],['Fukui','Fukui'],['Fukuoka','Fukuoka'],['Fukushima','Fukushima'],['Gifu','Gifu'],['Gunma','Gunma'],['Hiroshima','Hiroshima'],['Hokkaidō','Hokkaido'],['Hyōgo','Hyogo'],['Ibaraki','Ibaraki'],['Ishikawa','Ishikawa'],['Iwate','Iwate'],['Kagawa','Kagawa'],['Kagoshima','Kagoshima'],['Kanagawa','Kanagawa'],['Kumamoto','Kumamoto'],['Kyōto','Kyoto'],['Kōchi','Kochi'],['Mie','Mie'],['Miyagi','Miyagi'],['Miyazaki','Miyazaki'],['Nagano','Nagano'],['Nagasaki','Nagasaki'],['Nara','Nara'],['Niigata','Niigata'],['Okayama','Okayama'],['Okinawa','Okinawa'],['Saga','Saga'],['Saitama','Saitama'],['Shiga','Shiga'],['Shimane','Shimane'],['Shizuoka','Shizuoka'],['Tochigi','Tochigi'],['Tokushima','Tokushima'],['Tottori','Tottori'],['Toyama','Toyama'],['Tōkyō','Tokyo'],['Wakayama','Wakayama'],['Yamagata','Yamagata'],['Yamaguchi','Yamaguchi'],['Yamanashi','Yamanashi'],['Ōita','Oita'],['Ōsaka','Osaka']]"
-                      >
-                        Japan
-                      </option>
-                      <option
-                        value="Malaysia"
-                        data-provinces="[['Johor','Johor'],['Kedah','Kedah'],['Kelantan','Kelantan'],['Kuala Lumpur','Kuala Lumpur'],['Labuan','Labuan'],['Melaka','Malacca'],['Negeri Sembilan','Negeri Sembilan'],['Pahang','Pahang'],['Penang','Penang'],['Perak','Perak'],['Perlis','Perlis'],['Putrajaya','Putrajaya'],['Sabah','Sabah'],['Sarawak','Sarawak'],['Selangor','Selangor'],['Terengganu','Terengganu']]"
-                      >
-                        Malaysia
-                      </option>
-                      <option value="Netherlands" data-provinces="[]">
-                        Netherlands
-                      </option>
-                      <option
-                        value="New Zealand"
-                        data-provinces="[['Auckland','Auckland'],['Bay of Plenty','Bay of Plenty'],['Canterbury','Canterbury'],['Chatham Islands','Chatham Islands'],['Gisborne','Gisborne'],['Hawke's Bay','Hawke’s Bay'],['Manawatu-Wanganui','Manawatū-Whanganui'],['Marlborough','Marlborough'],['Nelson','Nelson'],['Northland','Northland'],['Otago','Otago'],['Southland','Southland'],['Taranaki','Taranaki'],['Tasman','Tasman'],['Waikato','Waikato'],['Wellington','Wellington'],['West Coast','West Coast']]"
-                      >
-                        New Zealand
-                      </option>
-                      <option value="Norway" data-provinces="[]">
-                        Norway
-                      </option>
-                      <option value="Poland" data-provinces="[]">
-                        Poland
-                      </option>
-                      <option
-                        value="Portugal"
-                        data-provinces="[['Aveiro','Aveiro'],['Açores','Azores'],['Beja','Beja'],['Braga','Braga'],['Bragança','Bragança'],['Castelo Branco','Castelo Branco'],['Coimbra','Coimbra'],['Faro','Faro'],['Guarda','Guarda'],['Leiria','Leiria'],['Lisboa','Lisbon'],['Madeira','Madeira'],['Portalegre','Portalegre'],['Porto','Porto'],['Santarém','Santarém'],['Setúbal','Setúbal'],['Viana do Castelo','Viana do Castelo'],['Vila Real','Vila Real'],['Viseu','Viseu'],['Évora','Évora']]"
-                      >
-                        Portugal
-                      </option>
-                      <option value="Singapore" data-provinces="[]">
-                        Singapore
-                      </option>
-                      <option
-                        value="South Korea"
-                        data-provinces="[['Busan','Busan'],['Chungbuk','North Chungcheong'],['Chungnam','South Chungcheong'],['Daegu','Daegu'],['Daejeon','Daejeon'],['Gangwon','Gangwon'],['Gwangju','Gwangju City'],['Gyeongbuk','North Gyeongsang'],['Gyeonggi','Gyeonggi'],['Gyeongnam','South Gyeongsang'],['Incheon','Incheon'],['Jeju','Jeju'],['Jeonbuk','North Jeolla'],['Jeonnam','South Jeolla'],['Sejong','Sejong'],['Seoul','Seoul'],['Ulsan','Ulsan']]"
-                      >
-                        South Korea
-                      </option>
-                      <option
-                        value="Spain"
-                        data-provinces="[['A Coruña','A Coruña'],['Albacete','Albacete'],['Alicante','Alicante'],['Almería','Almería'],['Asturias','Asturias Province'],['Badajoz','Badajoz'],['Balears','Balears Province'],['Barcelona','Barcelona'],['Burgos','Burgos'],['Cantabria','Cantabria Province'],['Castellón','Castellón'],['Ceuta','Ceuta'],['Ciudad Real','Ciudad Real'],['Cuenca','Cuenca'],['Cáceres','Cáceres'],['Cádiz','Cádiz'],['Córdoba','Córdoba'],['Girona','Girona'],['Granada','Granada'],['Guadalajara','Guadalajara'],['Guipúzcoa','Gipuzkoa'],['Huelva','Huelva'],['Huesca','Huesca'],['Jaén','Jaén'],['La Rioja','La Rioja Province'],['Las Palmas','Las Palmas'],['León','León'],['Lleida','Lleida'],['Lugo','Lugo'],['Madrid','Madrid Province'],['Melilla','Melilla'],['Murcia','Murcia'],['Málaga','Málaga'],['Navarra','Navarra'],['Ourense','Ourense'],['Palencia','Palencia'],['Pontevedra','Pontevedra'],['Salamanca','Salamanca'],['Santa Cruz de Tenerife','Santa Cruz de Tenerife'],['Segovia','Segovia'],['Sevilla','Seville'],['Soria','Soria'],['Tarragona','Tarragona'],['Teruel','Teruel'],['Toledo','Toledo'],['Valencia','Valencia'],['Valladolid','Valladolid'],['Vizcaya','Biscay'],['Zamora','Zamora'],['Zaragoza','Zaragoza'],['Álava','Álava'],['Ávila','Ávila']]"
-                      >
-                        Spain
-                      </option>
-                      <option value="Sweden" data-provinces="[]">
-                        Sweden
-                      </option>
-                      <option value="Switzerland" data-provinces="[]">
-                        Switzerland
-                      </option>
-                      <option
-                        value="United Arab Emirates"
-                        data-provinces="[['Abu Dhabi','Abu Dhabi'],['Ajman','Ajman'],['Dubai','Dubai'],['Fujairah','Fujairah'],['Ras al-Khaimah','Ras al-Khaimah'],['Sharjah','Sharjah'],['Umm al-Quwain','Umm al-Quwain']]"
-                      >
-                        United Arab Emirates
-                      </option>
-                      <option
-                        value="United Kingdom"
-                        data-provinces="[['British Forces','British Forces'],['England','England'],['Northern Ireland','Northern Ireland'],['Scotland','Scotland'],['Wales','Wales']]"
-                      >
-                        United Kingdom
-                      </option>
-                      <option value="Vietnam" data-provinces="[]">
-                        Vietnam
-                      </option>
-                    </select>
+                    <input type="text" placeholder={t("checkout.emailAddress")} />
+                    <input type="text" placeholder={t("checkout.phoneNumber")} />
                   </div>
                   <div className="grid-2">
-                    <input type="text" placeholder="Town/City*" />
-                    <input type="text" placeholder="Street,..." />
+                    <div>
+                      <input
+                        type="text"
+                        placeholder={t("checkout.cepPlaceholder")}
+                        value={cep}
+                        onChange={handleCepChange}
+                      />
+                      {shippingLoading && (
+                        <p style={{ fontSize: 12, color: "#888", marginTop: 4, marginBottom: 0 }}>
+                          {t("checkout.calculatingShipping")}
+                        </p>
+                      )}
+                      {shippingError && (
+                        <p style={{ fontSize: 12, color: "#dc3545", marginTop: 4, marginBottom: 0 }}>
+                          {shippingError}
+                        </p>
+                      )}
+                      {shippingResult && (
+                        <p style={{ fontSize: 12, color: "#28a745", marginTop: 4, marginBottom: 0 }}>
+                          {shippingResult.city}, {shippingResult.state} - R$ {parseFloat(shippingResult.price).toFixed(2)} ({shippingResult.estimated_days_min}-{shippingResult.estimated_days_max} {t("checkout.days")})
+                        </p>
+                      )}
+                    </div>
+                    <input type="text" placeholder={t("checkout.neighborhood")} />
+                  </div>
+                  <div className="grid-2">
+                    <input type="text" placeholder={t("checkout.townCity")} />
+                    <input type="text" placeholder={t("checkout.streetNumber")} />
                   </div>
                   <div className="grid-2">
                     <div className="tf-select">
                       <select className="text-title" data-default="">
-                        <option selected="" value="Choose State">
-                          Choose State
-                        </option>
-                        <option value="California">California</option>
-                        <option value="Alabama">Alabam</option>
-                        <option value="Alaska">Alaska</option>
-                        <option value="Arizona">Arizona</option>
-                        <option value="Arkansas">Arkansas</option>
-                        <option value="Florida">Florida</option>
-                        <option value="Georgia">Georgia</option>
-                        <option value="Hawaii">Hawaii</option>
-                        <option value="Washington">Washington</option>
-                        <option value="Texas">Texas</option>
-                        <option value="Iowa">Iowa</option>
-                        <option value="Nevada">Nevada</option>
-                        <option value="Illinois">Illinois</option>
+                        <option value="">{t("checkout.state")}</option>
+                        <option value="AC">AC</option>
+                        <option value="AL">AL</option>
+                        <option value="AP">AP</option>
+                        <option value="AM">AM</option>
+                        <option value="BA">BA</option>
+                        <option value="CE">CE</option>
+                        <option value="DF">DF</option>
+                        <option value="ES">ES</option>
+                        <option value="GO">GO</option>
+                        <option value="MA">MA</option>
+                        <option value="MT">MT</option>
+                        <option value="MS">MS</option>
+                        <option value="MG">MG</option>
+                        <option value="PA">PA</option>
+                        <option value="PB">PB</option>
+                        <option value="PR">PR</option>
+                        <option value="PE">PE</option>
+                        <option value="PI">PI</option>
+                        <option value="RJ">RJ</option>
+                        <option value="RN">RN</option>
+                        <option value="RS">RS</option>
+                        <option value="RO">RO</option>
+                        <option value="RR">RR</option>
+                        <option value="SC">SC</option>
+                        <option value="SP">SP</option>
+                        <option value="SE">SE</option>
+                        <option value="TO">TO</option>
                       </select>
                     </div>
-                    <input type="text" placeholder="Postal Code*" />
+                    <input type="text" placeholder={t("checkout.complement")} />
                   </div>
-                  <textarea placeholder="Write note..." defaultValue={""} />
+                  <textarea placeholder={t("checkout.writeNote")} defaultValue={""} />
                 </form>
               </div>
               <div className="wrap">
-                <h5 className="title">Choose payment Option:</h5>
+                <h5 className="title">{t("checkout.choosePayment")}</h5>
                 <form
                   className="form-payment"
                   onSubmit={(e) => e.preventDefault()}
@@ -258,7 +193,7 @@ export default function Checkout() {
                           id="credit-card-method"
                           defaultChecked
                         />
-                        <span className="text-title">Credit Card</span>
+                        <span className="text-title">{t("checkout.creditCard")}</span>
                       </label>
                       <div
                         id="credit-card-payment"
@@ -267,14 +202,12 @@ export default function Checkout() {
                       >
                         <div className="payment-body">
                           <p className="text-secondary">
-                            Make your payment directly into our bank account.
-                            Your order will not be shipped until the funds have
-                            cleared in our account.
+                            {t("checkout.creditCardDesc")}
                           </p>
                           <div className="input-payment-box">
-                            <input type="text" placeholder="Name On Card*" />
+                            <input type="text" placeholder={t("checkout.nameOnCard")} />
                             <div className="ip-card">
-                              <input type="text" placeholder="Card Numbers*" />
+                              <input type="text" placeholder={t("checkout.cardNumbers")} />
                               <div className="list-card">
                                 <Image
                                   width={48}
@@ -304,7 +237,7 @@ export default function Checkout() {
                             </div>
                             <div className="grid-2">
                               <input type="date" />
-                              <input type="text" placeholder="CVV*" />
+                              <input type="text" placeholder={t("checkout.cvv")} />
                             </div>
                           </div>
                           <div className="check-save">
@@ -315,7 +248,7 @@ export default function Checkout() {
                               defaultChecked
                             />
                             <label htmlFor="check-card">
-                              Save Card Details
+                              {t("checkout.saveCardDetails")}
                             </label>
                           </div>
                         </div>
@@ -335,7 +268,7 @@ export default function Checkout() {
                           className="tf-check-rounded"
                           id="delivery-method"
                         />
-                        <span className="text-title">Cash on delivery</span>
+                        <span className="text-title">{t("checkout.cashOnDelivery")}</span>
                       </label>
                       <div
                         id="delivery-payment"
@@ -403,7 +336,7 @@ export default function Checkout() {
                       />
                     </div>
                   </div>
-                  <button className="tf-btn btn-reset">Payment</button>
+                  <button className="tf-btn btn-reset">{t("checkout.payment")}</button>
                 </form>
               </div>
             </div>
@@ -414,7 +347,7 @@ export default function Checkout() {
           <div className="col-xl-5">
             <div className="flat-spacing flat-sidebar-checkout">
               <div className="sidebar-checkout-content">
-                <h5 className="title">Shopping Cart</h5>
+                <h5 className="title">{t("checkout.shoppingCart")}</h5>
                 <div className="list-product">
                   {cartProducts.map((elm, i) => (
                     <div key={i} className="item-product">
@@ -481,7 +414,7 @@ export default function Checkout() {
                         >
                           <div className="discount-top">
                             <div className="discount-off">
-                              <div className="text-caption-1">Discount</div>
+                              <div className="text-caption-1">{t("checkout.discount")}</div>
                               <span className="sale-off text-btn-uppercase">
                                 {item.discount}
                               </span>
@@ -495,7 +428,7 @@ export default function Checkout() {
                               {item.code}
                             </span>
                             <button className="tf-btn">
-                              <span className="text">Apply Code</span>
+                              <span className="text">{t("checkout.applyCode")}</span>
                             </button>
                           </div>
                         </div>{" "}
@@ -503,32 +436,35 @@ export default function Checkout() {
                     ))}
                   </Swiper>
                   <div className="ip-discount-code">
-                    <input type="text" placeholder="Add voucher discount" />
+                    <input type="text" placeholder={t("checkout.addVoucherDiscount")} />
                     <button className="tf-btn">
-                      <span className="text">Apply Code</span>
+                      <span className="text">{t("checkout.applyCode")}</span>
                     </button>
                   </div>
                   <p>
-                    Discount code is only used for orders with a total value of
-                    products over $500.00
+                    {t("checkout.discountNote")}
                   </p>
                 </div>
                 <div className="sec-total-price">
                   <div className="top">
                     <div className="item d-flex align-items-center justify-content-between text-button">
-                      <span>Shipping</span>
-                      <span>Free</span>
+                      <span>{t("checkout.shipping")}</span>
+                      <span>
+                        {shippingResult
+                          ? `R$ ${parseFloat(shippingResult.price).toFixed(2)}`
+                          : t("checkout.enterCep")}
+                      </span>
                     </div>
                     <div className="item d-flex align-items-center justify-content-between text-button">
-                      <span>Discounts</span>
-                      <span>-$80.00</span>
+                      <span>{t("checkout.discounts")}</span>
+                      <span>-${totalPrice ? "20.00" : "0.00"}</span>
                     </div>
                   </div>
                   <div className="bottom">
                     <h5 className="d-flex justify-content-between">
-                      <span>Total</span>
+                      <span>{t("checkout.total")}</span>
                       <span className="total-price-checkout">
-                        ${totalPrice.toFixed(2)}
+                        ${totalPrice ? (totalPrice - 20 + shippingPrice).toFixed(2) : "0.00"}
                       </span>
                     </h5>
                   </div>

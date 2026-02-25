@@ -5,7 +5,9 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navigation, Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Categories() {
+  const { t } = useLanguage();
   const params = {
     slidesPerView: 6,
     breakpoints: {
@@ -28,7 +30,7 @@ export default function Categories() {
     <section className="flat-spacing">
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Popular Categories</h3>
+          <h3 className="heading">{t("homepage.popularCategories")}</h3>
         </div>
         <div className="flat-collection-circle wow fadeInUp">
           <div className="swiper tf-sw-categories">
@@ -67,7 +69,7 @@ export default function Categories() {
                         <i className="icon icon-arrowUpRight" />
                       </Link>
                       <div className="count text-secondary">
-                        {category.itemsCount} items
+                        {category.itemsCount} {t("homepage.items")}
                       </div>
                     </div>
                   </div>

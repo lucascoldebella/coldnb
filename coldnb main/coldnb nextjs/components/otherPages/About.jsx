@@ -1,7 +1,9 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function About() {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState(1);
   return (
     <section className="flat-spacing about-us-main pb_0">
@@ -22,7 +24,7 @@ export default function About() {
           <div className="col-md-6">
             <div className="about-us-content">
               <h3 className="title wow fadeInUp">
-                ColdnbMain – Offering rare and beautiful items worldwide
+                {t("about.title")}
               </h3>
               <div className="widget-tabs style-3">
                 <ul className="widget-menu-tab wow fadeInUp">
@@ -30,27 +32,27 @@ export default function About() {
                     className={`item-title ${activeTab == 1 ? "active" : ""} `}
                     onClick={() => setActiveTab(1)}
                   >
-                    <span className="inner text-button">Introduction</span>
+                    <span className="inner text-button">{t("about.introduction")}</span>
                   </li>
                   <li
                     className={`item-title ${activeTab == 2 ? "active" : ""} `}
                     onClick={() => setActiveTab(2)}
                   >
-                    <span className="inner text-button">Our Vision</span>
+                    <span className="inner text-button">{t("about.ourVision")}</span>
                   </li>
                   <li
                     className={`item-title ${activeTab == 3 ? "active" : ""} `}
                     onClick={() => setActiveTab(3)}
                   >
                     <span className="inner text-button">
-                      What Sets Us Apart
+                      {t("about.whatSetsUsApart")}
                     </span>
                   </li>
                   <li
                     className={`item-title ${activeTab == 4 ? "active" : ""} `}
                     onClick={() => setActiveTab(4)}
                   >
-                    <span className="inner text-button">Our Commitment</span>
+                    <span className="inner text-button">{t("about.ourCommitment")}</span>
                   </li>
                 </ul>
                 <div className="widget-content-tab wow fadeInUp">
@@ -60,14 +62,7 @@ export default function About() {
                     } `}
                   >
                     <p>
-                      Welcome to ColdnbMain Store, your premier destination for
-                      fashion-forward clothing and accessories. We pride
-                      ourselves on offering a curated selection of rare and
-                      beautiful items sourced both locally and globally. Our
-                      mission is to bring you the latest trends and timeless
-                      styles, ensuring every piece reflects quality and
-                      elegance. Discover the perfect addition to your wardrobe
-                      at ColdnbMain Store.
+                      {t("about.introText")}
                     </p>
                   </div>
                   <div
@@ -76,14 +71,7 @@ export default function About() {
                     } `}
                   >
                     <p>
-                      Welcome to ColdnbMain Store, your premier destination for
-                      fashion-forward clothing and accessories. We pride
-                      ourselves on offering a curated selection of rare and
-                      beautiful items sourced both locally and globally. Our
-                      mission is to bring you the latest trends and timeless
-                      styles, ensuring every piece reflects quality and
-                      elegance. Discover the perfect addition to your wardrobe
-                      at ColdnbMain Store.
+                      {t("about.visionText")}
                     </p>
                   </div>
                   <div
@@ -92,14 +80,7 @@ export default function About() {
                     } `}
                   >
                     <p>
-                      Welcome to ColdnbMain Store, your premier destination for
-                      fashion-forward clothing and accessories. We pride
-                      ourselves on offering a curated selection of rare and
-                      beautiful items sourced both locally and globally. Our
-                      mission is to bring you the latest trends and timeless
-                      styles, ensuring every piece reflects quality and
-                      elegance. Discover the perfect addition to your wardrobe
-                      at ColdnbMain Store.
+                      {t("about.whatSetsUsApartText")}
                     </p>
                   </div>
                   <div
@@ -108,20 +89,13 @@ export default function About() {
                     } `}
                   >
                     <p>
-                      Welcome to ColdnbMain Store, your premier destination for
-                      fashion-forward clothing and accessories. We pride
-                      ourselves on offering a curated selection of rare and
-                      beautiful items sourced both locally and globally. Our
-                      mission is to bring you the latest trends and timeless
-                      styles, ensuring every piece reflects quality and
-                      elegance. Discover the perfect addition to your wardrobe
-                      at ColdnbMain Store.
+                      {t("about.commitmentText")}
                     </p>
                   </div>
                 </div>
               </div>
               <a href="#" className="tf-btn btn-fill wow fadeInUp">
-                <span className="text text-button">Read More</span>
+                <span className="text text-button">{t("about.readMore")}</span>
               </a>
             </div>
           </div>

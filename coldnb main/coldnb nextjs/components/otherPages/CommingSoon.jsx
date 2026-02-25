@@ -1,13 +1,15 @@
 "use client";
 import React from "react";
 import CountdownTimer from "../common/Countdown";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function CommingSoon() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing coming-soon">
       <div className="coming-soon-inner">
         <div className="content">
-          <div className="heading title-display">Coming Soon</div>
+          <div className="heading title-display">{t("homepage.comingSoon")}</div>
           <div className="tf-countdown-lg">
             <div
               className="js-countdown"
@@ -29,7 +31,7 @@ export default function CommingSoon() {
                   name="email-form"
                   id="subscribe-email"
                   className="subscribe-email"
-                  placeholder="Enter your e-mail"
+                  placeholder={t("newsletter.emailPlaceholder")}
                   tabIndex={0}
                   aria-required="true"
                 />

@@ -1,21 +1,31 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   availabilityOptions,
   brands,
-  categories,
   colors,
   sizes,
 } from "@/data/productFilterOptions";
-import { productMain } from "@/data/products";
+import { getCategories } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 import RangeSlider from "react-range-slider-input";
 export default function FilterModal({ allProps }) {
+  const { t } = useLanguage();
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    getCategories()
+      .then((cats) => setCategories(cats))
+      .catch(() => setCategories([]));
+  }, []);
+
   return (
     <div className="offcanvas offcanvas-start canvas-filter" id="filterShop">
       <div className="canvas-wrapper">
         <div className="canvas-header">
-          <h5>Filters</h5>
+          <h5>{t("shop.filters")}</h5>
           <span
             className="icon-close icon-close-popup"
             data-bs-dismiss="offcanvas"
@@ -24,30 +34,48 @@ export default function FilterModal({ allProps }) {
         </div>
         <div className="canvas-body">
           <div className="widget-facet facet-categories">
-            <h6 className="facet-title">Product Categories</h6>
+            <h6 className="facet-title">{t("shop.productCategories")}</h6>
             <ul className="facet-content">
-              {categories.map((category, index) => (
+              <li>
+                <a
+                  href="#"
+                  className={`categories-item ${!allProps.category ? "fw-bold" : ""}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    allProps.setCategory(null);
+                  }}
+                >
+                  {t("shop.allProducts")}
+                </a>
+              </li>
+              {categories.map((cat, index) => (
                 <li key={index}>
-                  <a href="#" className={`categories-item`}>
-                    {category.name}{" "}
-                    <span className="count-cate">({category.count})</span>
+                  <a
+                    href="#"
+                    className={`categories-item ${allProps.category === cat.slug ? "fw-bold" : ""}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      allProps.setCategory(cat.slug);
+                    }}
+                  >
+                    {cat.name}
                   </a>
                 </li>
               ))}
             </ul>
           </div>
           <div className="widget-facet facet-price">
-            <h6 className="facet-title">Price</h6>
+            <h6 className="facet-title">{t("shop.price")}</h6>
 
             <RangeSlider
-              min={10}
-              max={450}
+              min={0}
+              max={1000}
               value={allProps.price}
               onInput={(value) => allProps.setPrice(value)}
             />
             <div className="box-price-product mt-3">
               <div className="box-price-item">
-                <span className="title-price">Min price</span>
+                <span className="title-price">{t("shop.minPrice")}</span>
                 <div
                   className="price-val"
                   id="price-min-value"
@@ -57,7 +85,7 @@ export default function FilterModal({ allProps }) {
                 </div>
               </div>
               <div className="box-price-item">
-                <span className="title-price">Max price</span>
+                <span className="title-price">{t("shop.maxPrice")}</span>
                 <div
                   className="price-val"
                   id="price-max-value"
@@ -69,7 +97,7 @@ export default function FilterModal({ allProps }) {
             </div>
           </div>
           <div className="widget-facet facet-size">
-            <h6 className="facet-title">Size</h6>
+            <h6 className="facet-title">{t("shop.size")}</h6>
             <div className="facet-size-box size-box">
               {sizes.map((size, index) => (
                 <span
@@ -88,12 +116,12 @@ export default function FilterModal({ allProps }) {
                 } `}
                 onClick={() => allProps.setSize("Free Size")}
               >
-                Free Size
+                {t("shop.freeSize")}
               </span>
             </div>
           </div>
           <div className="widget-facet facet-color">
-            <h6 className="facet-title">Colors</h6>
+            <h6 className="facet-title">{t("shop.colors")}</h6>
             <div className="facet-color-box">
               {colors.map((color, index) => (
                 <div
@@ -110,7 +138,7 @@ export default function FilterModal({ allProps }) {
             </div>
           </div>
           <div className="widget-facet facet-fieldset">
-            <h6 className="facet-title">Availability</h6>
+            <h6 className="facet-title">{t("shop.availability")}</h6>
             <div className="box-fieldset-item">
               {availabilityOptions.map((option, index) => (
                 <fieldset
@@ -126,22 +154,14 @@ export default function FilterModal({ allProps }) {
                     checked={allProps.availability === option}
                   />
                   <label>
-                    {option.label}{" "}
-                    <span className="count-stock">
-                      (
-                      {
-                        productMain.filter((el) => el.inStock == option.value)
-                          .length
-                      }
-                      )
-                    </span>
+                    {option.label}
                   </label>
                 </fieldset>
               ))}
             </div>
           </div>
           <div className="widget-facet facet-fieldset">
-            <h6 className="facet-title">Brands</h6>
+            <h6 className="facet-title">{t("shop.brands")}</h6>
             <div className="box-fieldset-item">
               {brands.map((brand, index) => (
                 <fieldset
@@ -157,16 +177,7 @@ export default function FilterModal({ allProps }) {
                     checked={allProps.brands.includes(brand.label)}
                   />
                   <label>
-                    {brand.label}{" "}
-                    <span className="count-brand">
-                      (
-                      {
-                        productMain.filter((el) =>
-                          el.filterBrands.includes(brand.label)
-                        ).length
-                      }
-                      )
-                    </span>
+                    {brand.label}
                   </label>
                 </fieldset>
               ))}
@@ -179,7 +190,7 @@ export default function FilterModal({ allProps }) {
             onClick={allProps.clearFilter}
             className="tf-btn btn-reset"
           >
-            Reset Filters
+            {t("shop.resetFilters")}
           </button>
         </div>
       </div>

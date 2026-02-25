@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function SizeGuide() {
+  const { t } = useLanguage();
   const [rangeValue1, setRangeValue1] = useState(50);
   const [rangeValue2, setRangeValue2] = useState(50);
   const [activeTab, setActiveTab] = useState(1);
@@ -37,13 +39,13 @@ export default function SizeGuide() {
                 className={`item-title ${activeTab == 1 ? "active" : ""} `}
                 onClick={() => setActiveTab(1)}
               >
-                <span className="inner text-button">Size </span>
+                <span className="inner text-button">{t("sizeGuide.size")}</span>
               </li>
               <li
                 className={`item-title ${activeTab == 2 ? "active" : ""} `}
                 onClick={() => setActiveTab(2)}
               >
-                <span className="inner text-button">Size Guide</span>
+                <span className="inner text-button">{t("sizeGuide.sizeGuide")}</span>
               </li>
             </ul>
             <span
@@ -62,7 +64,7 @@ export default function SizeGuide() {
                   <div>
                     <div className="widget-size mb_16">
                       <div className="box-title-size">
-                        <div className="title-size">Height</div>
+                        <div className="title-size">{t("sizeGuide.height")}</div>
                         <div className="number-size">
                           <span className="max-size">{rangeValue1 * 2}</span>
                           <span className="text-caption-1 text-secondary">
@@ -89,7 +91,7 @@ export default function SizeGuide() {
                     </div>
                     <div className="widget-size">
                       <div className="box-title-size">
-                        <div className="title-size">Weight</div>
+                        <div className="title-size">{t("sizeGuide.weight")}</div>
                         <div className="number-size">
                           <span className="max-size">{rangeValue2}</span>
                           <span className="text-caption-1 text-secondary">
@@ -129,7 +131,7 @@ export default function SizeGuide() {
                     ))}
                   </div>
                   <div>
-                    <h6 className="suggests-title">ColdnbMain suggests for you:</h6>
+                    <h6 className="suggests-title">{t("sizeGuide.suggestsForYou")}</h6>
                     <div className="suggests-list">
                       <a href="#" className="suggests-item link text-button">
                         L - shirt
@@ -152,11 +154,11 @@ export default function SizeGuide() {
                 <table className="tab-sizeguide-table">
                   <thead>
                     <tr>
-                      <th>Size</th>
-                      <th>US</th>
-                      <th>Bust</th>
-                      <th>Waist</th>
-                      <th>Low Hip</th>
+                      <th>{t("sizeGuide.size")}</th>
+                      <th>{t("sizeGuide.us")}</th>
+                      <th>{t("sizeGuide.bust")}</th>
+                      <th>{t("sizeGuide.waist")}</th>
+                      <th>{t("sizeGuide.lowHip")}</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -2,7 +2,13 @@ import React from "react";
 import ProductsCards6 from "../productCards/ProductsCards6";
 import Pagination from "../common/Pagination";
 
-export default function Listview({ products, pagination = true }) {
+export default function Listview({
+  products,
+  pagination = true,
+  currentPage,
+  totalPages,
+  onPageChange,
+}) {
   return (
     <>
       {/* card product list 1 */}
@@ -10,9 +16,13 @@ export default function Listview({ products, pagination = true }) {
         <ProductsCards6 product={product} key={i} />
       ))}
       {/* pagination */}
-      {pagination ? (
+      {pagination && totalPages > 1 ? (
         <ul className="wg-pagination ">
-          <Pagination />
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
         </ul>
       ) : (
         ""

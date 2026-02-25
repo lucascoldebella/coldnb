@@ -1,13 +1,15 @@
 "use client";
 import React, { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const SizeSelector = () => {
+  const { t } = useLanguage();
   const [selectedSize, setSelectedSize] = useState("M");
   const sizes = ["S", "M", "L", "XL"];
 
   return (
     <div className="tf-sticky-atc-size d-flex gap-12 align-items-center">
-      <div className="tf-sticky-atc-infos-title text-title">Size:</div>
+      <div className="tf-sticky-atc-infos-title text-title">{t("product.sizeLabel")}</div>
       <div className="tf-dropdown-sort style-2" data-bs-toggle="dropdown">
         <div className="btn-select">
           <span className="text-sort-value font-2">{selectedSize}</span>

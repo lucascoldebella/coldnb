@@ -40,6 +40,21 @@ static enum MHD_Result collect_headers(void *cls, enum MHD_ValueKind kind,
     return MHD_YES;
 }
 
+/* Collect query parameters from libmicrohttpd */
+static enum MHD_Result collect_query_params(void *cls, enum MHD_ValueKind kind,
+                                            const char *key, const char *value) {
+    (void)kind;
+    HttpRequest *req = (HttpRequest *)cls;
+
+    if (req->query_param_count < HTTP_MAX_PARAMS && key != NULL) {
+        req->query_params[req->query_param_count].name = str_dup(key);
+        req->query_params[req->query_param_count].value = str_dup(value ? value : "");
+        req->query_param_count++;
+    }
+
+    return MHD_YES;
+}
+
 /* Build MHD response from HttpResponse */
 static struct MHD_Response *build_mhd_response(HttpResponse *resp) {
     struct MHD_Response *mhd_resp;
@@ -146,15 +161,12 @@ static enum MHD_Result request_handler(void *cls,
         ctx->request->method = http_method_from_string(method);
         ctx->request->connection = connection;
 
-        /* Split path and query string */
-        char *query = strchr(url, '?');
-        if (query != NULL) {
-            ctx->request->path = str_ndup(url, (size_t)(query - url));
-            ctx->request->query_string = str_dup(query + 1);
-            http_request_parse_query_string(ctx->request);
-        } else {
-            ctx->request->path = str_dup(url);
-        }
+        /* MHD strips query string from url, so just use it as the path */
+        ctx->request->path = str_dup(url);
+
+        /* Collect query parameters via MHD (MHD handles parsing internally) */
+        MHD_get_connection_values(connection, MHD_GET_ARGUMENT_KIND,
+                                  collect_query_params, ctx->request);
 
         /* Collect headers */
         MHD_get_connection_values(connection, MHD_HEADER_KIND,

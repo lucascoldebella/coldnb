@@ -1,8 +1,33 @@
+"use client";
 import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import CountdownTimer from "@/components/common/Countdown";
-export default function BannerCountdown() {
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
+const getDefaultBanner = (t) => ({
+  title: t("homepage.limitedTimeDeals"),
+  subtitle: t("homepage.upTo50Off"),
+  btnText: t("homepage.shopNow"),
+  btnLink: "/shop-default-grid",
+  imgSrc: "/images/banner/img-countdown1.png",
+  countdownTarget: "2025-06-31T23:59:59",
+});
+
+export default function BannerCountdown({ data }) {
+  const { t } = useLanguage();
+  const defaultBanner = getDefaultBanner(t);
+  const banner = data
+    ? {
+        title: data.title || defaultBanner.title,
+        subtitle: data.discount_label || defaultBanner.subtitle,
+        btnText: data.button_text || defaultBanner.btnText,
+        btnLink: data.button_link || defaultBanner.btnLink,
+        imgSrc: data.image_url || defaultBanner.imgSrc,
+        countdownTarget: data.countdown_end_at || defaultBanner.countdownTarget,
+      }
+    : defaultBanner;
+
   return (
     <section className="bg-surface flat-spacing flat-countdown-banner">
       <div className="container">
@@ -10,14 +35,14 @@ export default function BannerCountdown() {
           <div className="col-lg-5">
             <div className="banner-left">
               <div className="box-title">
-                <h3 className="wow fadeInUp">Limited-Time Deals On!</h3>
+                <h3 className="wow fadeInUp">{banner.title}</h3>
                 <p className="text-secondary wow fadeInUp">
-                  Up to 50% Off Selected Styles. Don't Miss Out.
+                  {banner.subtitle}
                 </p>
               </div>
               <div className="btn-banner wow fadeInUp">
-                <Link href={`/shop-default-grid`} className="tf-btn btn-fill">
-                  <span className="text">Shop Now</span>
+                <Link href={banner.btnLink} className="tf-btn btn-fill">
+                  <span className="text">{banner.btnText}</span>
                   <i className="icon icon-arrowUpRight" />
                 </Link>
               </div>
@@ -27,9 +52,9 @@ export default function BannerCountdown() {
             <div className="banner-img">
               <Image
                 className="lazyload"
-                data-src="/images/banner/img-countdown1.png"
+                data-src={banner.imgSrc}
                 alt="banner"
-                src="/images/banner/img-countdown1.png"
+                src={banner.imgSrc}
                 width={607}
                 height={655}
               />
@@ -43,7 +68,7 @@ export default function BannerCountdown() {
                   data-timer={1007500}
                   data-labels="Days,Hours,Mins,Secs"
                 >
-                  <CountdownTimer style={2} />
+                  <CountdownTimer style={2} targetDate={banner.countdownTarget} />
                 </div>
               </div>
             </div>

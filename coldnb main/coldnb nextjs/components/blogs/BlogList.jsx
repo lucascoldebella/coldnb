@@ -1,10 +1,13 @@
+"use client";
 import React from "react";
 import Sidebar from "./Sidebar";
 import Pagination from "../common/Pagination";
 import Link from "next/link";
 import Image from "next/image";
 import { blogPosts6 } from "@/data/blogs";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function BlogList() {
+  const { t } = useLanguage();
   return (
     <div className="main-content-page">
       <div className="container">
@@ -53,7 +56,7 @@ export default function BlogList() {
                     href={`/blog-detail/${post.id}`}
                     className="link text-button bot-button"
                   >
-                    Read More
+                    {t("blog.readMore")}
                   </Link>
                 </div>
               </div>

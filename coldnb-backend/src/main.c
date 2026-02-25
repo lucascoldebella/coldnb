@@ -26,6 +26,10 @@
 #include "handlers/handler_admin_orders.h"
 #include "handlers/handler_admin_products.h"
 #include "handlers/handler_admin_analytics.h"
+#include "handlers/handler_admin_employees.h"
+#include "handlers/handler_admin_homepage.h"
+#include "handlers/handler_admin_navigation.h"
+#include "handlers/handler_shipping.h"
 #include "util/hash_util.h"
 #include "log/log.h"
 
@@ -285,6 +289,10 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     http_router_use_path(router, "/api/admin/users", auth_middleware_admin, NULL);
     http_router_use_path(router, "/api/admin/products", auth_middleware_admin, NULL);
     http_router_use_path(router, "/api/admin/analytics", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/homepage", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/navigation", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/shipping", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/categories", auth_middleware_admin, NULL);
 
     /* Protected routes (auth required) */
     handler_cart_register(router, pool);
@@ -299,6 +307,10 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     handler_admin_orders_register(router, pool);
     handler_admin_products_register(router, pool);
     handler_admin_analytics_register(router, pool);
+    handler_admin_employees_register(router, pool);
+    handler_admin_homepage_register(router, pool);
+    handler_admin_navigation_register(router, pool);
+    handler_shipping_register(router, pool);
 
     LOG_INFO("Routes registered");
 }

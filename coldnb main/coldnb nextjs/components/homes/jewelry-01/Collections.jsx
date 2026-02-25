@@ -5,7 +5,9 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Collections() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing pt-0">
       <div className="container">
@@ -61,7 +63,7 @@ export default function Collections() {
                       href={`/shop-default-grid`}
                       className="btn-line style-white"
                     >
-                      Shop Now
+                      {t("homepage.shopNow")}
                     </Link>
                   </div>
                 </div>

@@ -526,6 +526,20 @@
             }
         }
     }
+    // Fix currency/language dropdown alignment in RTL
+    .image-select.type-currencies,
+    .image-select.type-languages {
+        > .dropdown-menu {
+            inset: auto 0px 0px auto !important;
+        }
+    }
+    // Keep English text content LTR in RTL layout
+    .tf-mini-cart-threshold,
+    .notification-sold,
+    .notification-progress {
+        unicode-bidi: isolate;
+        direction: ltr;
+    }
     .testimonial-item {
         direction: rtl;
         .product > a {

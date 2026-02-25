@@ -1,9 +1,11 @@
 "use client";
 import React from "react";
 import Link from "next/link";
-import { allProducts } from "@/data/products";
 import { usePathname } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 export default function Breadcumb({ product }) {
+  const { t } = useLanguage();
   const pathname = usePathname();
   return (
     <div className="tf-breadcrumb">
@@ -11,7 +13,7 @@ export default function Breadcumb({ product }) {
         <div className="tf-breadcrumb-wrap">
           <div className="tf-breadcrumb-list">
             <Link href={`/`} className="text text-caption-1">
-              Homepage
+              {t("product.homepage")}
             </Link>
 
             <i className="icon icon-arrRight" />
@@ -26,13 +28,11 @@ export default function Breadcumb({ product }) {
             >
               <i className="icon icon-arrLeft" />
             </Link>
-            <a href="#" className="tf-breadcrumb-back">
+            <Link href="/shop-default-grid" className="tf-breadcrumb-back">
               <i className="icon icon-squares-four" />
-            </a>
+            </Link>
             <Link
-              href={`/${pathname.split("/")[1]}/${
-                product.id >= allProducts.length ? 1 : product.id + 1
-              }`}
+              href={`/${pathname.split("/")[1]}/${product.id + 1}`}
               className="tf-breadcrumb-next"
             >
               <i className="icon icon-arrRight" />

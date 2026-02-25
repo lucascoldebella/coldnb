@@ -74,7 +74,7 @@ export default function Header10() {
                       </Link>
                       <p className="text-center text-secondary-2">
                         Don’t have an account?{" "}
-                        <Link href={`/register`}>Register</Link>
+                        <Link href={`/login`}>Register</Link>
                       </p>
                     </div>
                     <div className="sub-bot">

@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ProductSorting() {
-  const [selectedOption, setSelectedOption] = useState("Supper Sale");
+  const { t } = useLanguage();
+  const [selectedOption, setSelectedOption] = useState(t("shop.superSale"));
 
   const handleSelect = (value) => {
     setSelectedOption(value);
@@ -16,10 +18,10 @@ export default function ProductSorting() {
       </div>
       <div className="dropdown-menu">
         {[
-          "Supper Sale",
-          "Best selling",
-          "Alphabetically, A-Z",
-          "Alphabetically, Z-A",
+          t("shop.superSale"),
+          t("shop.bestSelling"),
+          t("shop.alphaAZ"),
+          t("shop.alphaZA"),
         ].map((option) => (
           <div
             key={option}

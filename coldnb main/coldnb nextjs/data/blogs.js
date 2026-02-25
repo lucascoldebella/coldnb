@@ -199,7 +199,7 @@ export const blogPosts6 = [
     id: 21,
     imgSrc: "/images/blog/blog-grid-1.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "How Technology is Transforming the Industry",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -208,7 +208,7 @@ export const blogPosts6 = [
     id: 22,
     imgSrc: "/images/blog/blog-grid-2.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "The Future of Fashion How Technology Transforms the Industry",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -217,7 +217,7 @@ export const blogPosts6 = [
     id: 23,
     imgSrc: "/images/blog/blog-grid-3.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "From Concept to Closet The Journey of Sustainable Fashion",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -226,7 +226,7 @@ export const blogPosts6 = [
     id: 24,
     imgSrc: "/images/blog/blog-grid-4.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "Unlocking Style Potential Personalization in Fashion Retail",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -235,7 +235,7 @@ export const blogPosts6 = [
     id: 25,
     imgSrc: "/images/blog/blog-grid-5.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "Fashion Forward Embracing Diversity and Inclusion in Design",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -244,7 +244,7 @@ export const blogPosts6 = [
     id: 26,
     imgSrc: "/images/blog/blog-grid-6.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "The Ultimate Guide: Dressing Stylishly with Minimal Effort",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -253,7 +253,7 @@ export const blogPosts6 = [
     id: 27,
     imgSrc: "/images/blog/blog-grid-7.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "How to Transition Your Wardrobe from Day to Night",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",
@@ -262,7 +262,7 @@ export const blogPosts6 = [
     id: 28,
     imgSrc: "/images/blog/blog-grid-8.jpg",
     date: "February 28, 2024",
-    author: "Themesflat",
+    author: "Coldnb",
     title: "Embracing Change: The Role of AI in the Fashion Industry",
     description:
       "Lorem ipsum dolor sit amet, consectetur adipiscing elit. In sed vulputate massa.",

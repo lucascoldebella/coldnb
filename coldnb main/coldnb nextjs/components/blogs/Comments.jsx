@@ -1,9 +1,12 @@
+"use client";
 import React from "react";
 import Image from "next/image";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Comments() {
+  const { t } = useLanguage();
   return (
     <div className="reply-comment">
-      <h4 className="reply-comment-heading">03 Comments</h4>
+      <h4 className="reply-comment-heading">{"03 " + t("blog.comments")}</h4>
       <div className="reply-comment-wrap">
         <div className="reply-comment-item">
           <div className="image">
@@ -30,7 +33,7 @@ export default function Comments() {
             </p>
             <div>
               <a className="text-button" href="#">
-                Reply
+                {t("blog.reply")}
               </a>
             </div>
           </div>

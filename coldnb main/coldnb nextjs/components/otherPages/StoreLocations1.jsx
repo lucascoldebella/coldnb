@@ -1,6 +1,9 @@
+"use client";
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function StoreLocations1() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
@@ -8,76 +11,76 @@ export default function StoreLocations1() {
           <div className="col-xl-4 col-md-5 col-12">
             <div className="tf-store-list">
               <div className="tf-store-item">
-                <h6 className="tf-store-title">New York Office</h6>
+                <h6 className="tf-store-title">{t("storeLocations.saoPauloOffice")}</h6>
                 <div className="tf-store-contact">
                   <div className="tf-store-info">
-                    <p className="text-button">Phone:</p>
+                    <p className="text-button">{t("storeLocations.phoneLabel")}</p>
                     <p className="text-secondary">+1 666 234 8888</p>
                   </div>
                   <div className="tf-store-info">
-                    <p className="text-button">Email:</p>
-                    <p className="text-secondary">themesflat@gmail.com</p>
+                    <p className="text-button">{t("storeLocations.emailLabel")}</p>
+                    <p className="text-secondary">contato@coldnb.com.br</p>
                   </div>
                 </div>
                 <div className="tf-store-address tf-store-info">
-                  <p className="text-button">Address:</p>
+                  <p className="text-button">{t("storeLocations.addressLabel")}</p>
                   <p className="text-secondary">
                     432 Park Avenue, New York, New York
                   </p>
                 </div>
               </div>
               <div className="tf-store-item">
-                <h6 className="tf-store-title">Houston Office</h6>
+                <h6 className="tf-store-title">{t("storeLocations.rioOffice")}</h6>
                 <div className="tf-store-contact">
                   <div className="tf-store-info">
-                    <p className="text-button">Phone:</p>
+                    <p className="text-button">{t("storeLocations.phoneLabel")}</p>
                     <p className="text-secondary">+1 713 432 8765</p>
                   </div>
                   <div className="tf-store-info">
-                    <p className="text-button">Email:</p>
-                    <p className="text-secondary">themesflat@gmail.com</p>
+                    <p className="text-button">{t("storeLocations.emailLabel")}</p>
+                    <p className="text-secondary">contato@coldnb.com.br</p>
                   </div>
                 </div>
                 <div className="tf-store-address tf-store-info">
-                  <p className="text-button">Address:</p>
+                  <p className="text-button">{t("storeLocations.addressLabel")}</p>
                   <p className="text-secondary">
                     789 Main Street, Houston, Texas
                   </p>
                 </div>
               </div>
               <div className="tf-store-item">
-                <h6 className="tf-store-title">San Francisco Office</h6>
+                <h6 className="tf-store-title">{t("storeLocations.bhOffice")}</h6>
                 <div className="tf-store-contact">
                   <div className="tf-store-info">
-                    <p className="text-button">Phone:</p>
+                    <p className="text-button">{t("storeLocations.phoneLabel")}</p>
                     <p className="text-secondary">+1 415 987 6543</p>
                   </div>
                   <div className="tf-store-info">
-                    <p className="text-button">Email:</p>
-                    <p className="text-secondary">themesflat@gmail.com</p>
+                    <p className="text-button">{t("storeLocations.emailLabel")}</p>
+                    <p className="text-secondary">contato@coldnb.com.br</p>
                   </div>
                 </div>
                 <div className="tf-store-address tf-store-info">
-                  <p className="text-button">Address:</p>
+                  <p className="text-button">{t("storeLocations.addressLabel")}</p>
                   <p className="text-secondary">
                     321 Market Street, San Francisco, California
                   </p>
                 </div>
               </div>
               <div className="tf-store-item">
-                <h6 className="tf-store-title">Miami Office</h6>
+                <h6 className="tf-store-title">{t("storeLocations.curitibaOffice")}</h6>
                 <div className="tf-store-contact">
                   <div className="tf-store-info">
-                    <p className="text-button">Phone:</p>
+                    <p className="text-button">{t("storeLocations.phoneLabel")}</p>
                     <p className="text-secondary">+1 305 543 2109</p>
                   </div>
                   <div className="tf-store-info">
-                    <p className="text-button">Email:</p>
-                    <p className="text-secondary">themesflat@gmail.com</p>
+                    <p className="text-button">{t("storeLocations.emailLabel")}</p>
+                    <p className="text-secondary">contato@coldnb.com.br</p>
                   </div>
                 </div>
                 <div className="tf-store-address tf-store-info">
-                  <p className="text-button">Address:</p>
+                  <p className="text-button">{t("storeLocations.addressLabel")}</p>
                   <p className="text-secondary">
                     Address: 654 Ocean Drive, Miami, Florida
                   </p>

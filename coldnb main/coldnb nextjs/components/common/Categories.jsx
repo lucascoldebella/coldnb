@@ -5,12 +5,14 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Navigation } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Categories({ parentClass = "flat-spacing pt-0" }) {
+  const { t } = useLanguage();
   return (
     <section className={parentClass}>
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Shop by product type</h3>
+          <h3 className="heading">{t("homepage.shopByProductType")}</h3>
         </div>
         <div
           className="flat-collection-circle wow fadeInUp"

@@ -4,13 +4,15 @@ import LayoutHandler from "./LayoutHandler";
 import Sorting from "./Sorting";
 import Listview from "./Listview";
 import GridView from "./GridView";
-import { useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import FilterModal from "./FilterModal";
 import { initialState, reducer } from "@/reducer/filterReducer";
-import { productMain } from "@/data/products";
 import FilterMeta from "./FilterMeta";
+import { getProducts } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Products1({ parentClass = "flat-spacing" }) {
+  const { t } = useLanguage();
   const [activeLayout, setActiveLayout] = useState(4);
   const [state, dispatch] = useReducer(reducer, initialState);
   const {
@@ -19,14 +21,16 @@ export default function Products1({ parentClass = "flat-spacing" }) {
     color,
     size,
     brands,
-
+    category,
     filtered,
     sortingOption,
     sorted,
-
     activeFilterOnSale,
     currentPage,
     itemPerPage,
+    totalItems,
+    totalPages,
+    loading,
   } = state;
 
   const allProps = {
@@ -57,8 +61,13 @@ export default function Products1({ parentClass = "flat-spacing" }) {
     },
     removeBrand: (newBrand) => {
       const updated = [...brands].filter((brand) => brand != newBrand);
-
       dispatch({ type: "SET_BRANDS", payload: updated });
+    },
+    setCategory: (value) => {
+      dispatch({
+        type: "SET_CATEGORY",
+        payload: value === category ? null : value,
+      });
     },
     setSortingOption: (value) =>
       dispatch({ type: "SET_SORTING_OPTION", payload: value }),
@@ -74,75 +83,84 @@ export default function Products1({ parentClass = "flat-spacing" }) {
     },
   };
 
+  // Map frontend sorting options to backend sort param
+  const getSortParam = useCallback((option) => {
+    switch (option) {
+      case "Price Ascending":
+        return "price_asc";
+      case "Price Descending":
+        return "price_desc";
+      case "Title Ascending":
+        return "name";
+      case "Title Descending":
+        return "name"; // Backend only supports name ASC; we'll reverse client-side if needed
+      default:
+        return "newest";
+    }
+  }, []);
+
+  // Fetch products from API when filters change
   useEffect(() => {
-    let filteredArrays = [];
+    let cancelled = false;
+    const fetchProducts = async () => {
+      dispatch({ type: "SET_LOADING", payload: true });
+      try {
+        const params = {
+          page: currentPage,
+          per_page: itemPerPage,
+          sort: getSortParam(sortingOption),
+        };
 
-    if (brands.length) {
-      const filteredByBrands = [...productMain].filter((elm) =>
-        brands.every((el) => elm.filterBrands.includes(el))
-      );
-      filteredArrays = [...filteredArrays, filteredByBrands];
-    }
-    if (availability !== "All") {
-      const filteredByavailability = [...productMain].filter(
-        (elm) => availability.value === elm.inStock
-      );
-      filteredArrays = [...filteredArrays, filteredByavailability];
-    }
-    if (color !== "All") {
-      const filteredByColor = [...productMain].filter((elm) =>
-        elm.filterColor.includes(color.name)
-      );
-      filteredArrays = [...filteredArrays, filteredByColor];
-    }
-    if (size !== "All" && size !== "Free Size") {
-      const filteredBysize = [...productMain].filter((elm) =>
-        elm.filterSizes.includes(size)
-      );
-      filteredArrays = [...filteredArrays, filteredBysize];
-    }
-    if (activeFilterOnSale) {
-      const filteredByonSale = [...productMain].filter((elm) => elm.oldPrice);
-      filteredArrays = [...filteredArrays, filteredByonSale];
-    }
+        if (category) {
+          params.category = category;
+        }
+        if (price[0] > 0) {
+          params.min_price = price[0];
+        }
+        if (price[1] < 1000) {
+          params.max_price = price[1];
+        }
+        if (activeFilterOnSale) {
+          params.sale = "true";
+        }
 
-    const filteredByPrice = [...productMain].filter(
-      (elm) => elm.price >= price[0] && elm.price <= price[1]
-    );
-    filteredArrays = [...filteredArrays, filteredByPrice];
+        const result = await getProducts(params);
 
-    const commonItems = [...productMain].filter((item) =>
-      filteredArrays.every((array) => array.includes(item))
-    );
-    dispatch({ type: "SET_FILTERED", payload: commonItems });
-  }, [price, availability, color, size, brands, activeFilterOnSale]);
+        if (!cancelled) {
+          let products = result.products;
 
-  useEffect(() => {
-    if (sortingOption === "Price Ascending") {
-      dispatch({
-        type: "SET_SORTED",
-        payload: [...filtered].sort((a, b) => a.price - b.price),
-      });
-    } else if (sortingOption === "Price Descending") {
-      dispatch({
-        type: "SET_SORTED",
-        payload: [...filtered].sort((a, b) => b.price - a.price),
-      });
-    } else if (sortingOption === "Title Ascending") {
-      dispatch({
-        type: "SET_SORTED",
-        payload: [...filtered].sort((a, b) => a.title.localeCompare(b.title)),
-      });
-    } else if (sortingOption === "Title Descending") {
-      dispatch({
-        type: "SET_SORTED",
-        payload: [...filtered].sort((a, b) => b.title.localeCompare(a.title)),
-      });
-    } else {
-      dispatch({ type: "SET_SORTED", payload: filtered });
-    }
-    dispatch({ type: "SET_CURRENT_PAGE", payload: 1 });
-  }, [filtered, sortingOption]);
+          // Client-side filtering for Title Descending (backend only does ASC)
+          if (sortingOption === "Title Descending") {
+            products = [...products].reverse();
+          }
+
+          dispatch({
+            type: "SET_PRODUCTS",
+            payload: { products, pagination: result.pagination },
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch products:", error);
+        if (!cancelled) {
+          dispatch({ type: "SET_LOADING", payload: false });
+        }
+      }
+    };
+
+    fetchProducts();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    currentPage,
+    itemPerPage,
+    category,
+    price,
+    sortingOption,
+    activeFilterOnSale,
+    getSortParam,
+  ]);
+
   return (
     <>
       <section className={parentClass}>
@@ -156,7 +174,7 @@ export default function Products1({ parentClass = "flat-spacing" }) {
                 className="tf-btn-filter"
               >
                 <span className="icon icon-filter" />
-                <span className="text">Filters</span>
+                <span className="text">{t("shop.filters")}</span>
               </a>
               <div
                 onClick={allProps.toggleFilterWithOnSale}
@@ -165,7 +183,7 @@ export default function Products1({ parentClass = "flat-spacing" }) {
                 }`}
               >
                 <i className="icon icon-checkCircle" />
-                <p className="text-caption-1">Shop sale items only</p>
+                <p className="text-caption-1">{t("shop.shopSaleOnly")}</p>
               </div>
             </div>
             <ul className="tf-control-layout">
@@ -175,23 +193,43 @@ export default function Products1({ parentClass = "flat-spacing" }) {
               />
             </ul>
             <div className="tf-control-sorting">
-              <p className="d-none d-lg-block text-caption-1">Sort by:</p>
+              <p className="d-none d-lg-block text-caption-1">{t("shop.sortBy")}</p>
               <Sorting allProps={allProps} />
             </div>
           </div>
           <div className="wrapper-control-shop">
-            <FilterMeta productLength={sorted.length} allProps={allProps} />
+            <FilterMeta productLength={totalItems} allProps={allProps} />
 
-            {activeLayout == 1 ? (
+            {loading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">{t("common.loading")}</span>
+                </div>
+              </div>
+            ) : sorted.length === 0 ? (
+              <div className="text-center py-5">
+                <p>{t("shop.noProducts")}</p>
+              </div>
+            ) : activeLayout == 1 ? (
               <div className="tf-list-layout wrapper-shop" id="listLayout">
-                <Listview products={sorted} />
+                <Listview
+                  products={sorted}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={allProps.setCurrentPage}
+                />
               </div>
             ) : (
               <div
                 className={`tf-grid-layout wrapper-shop tf-col-${activeLayout}`}
                 id="gridLayout"
               >
-                <GridView products={sorted} />
+                <GridView
+                  products={sorted}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={allProps.setCurrentPage}
+                />
               </div>
             )}
           </div>

@@ -5,17 +5,18 @@ import Image from "next/image";
 import { blogPosts6 } from "@/data/blogs";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function RelatedBlogs() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="row">
           <div className="col-12">
             <div className="heading-section text-center">
-              <h3>Related Articles</h3>
+              <h3>{t("blog.relatedArticles")}</h3>
               <p className="body-text-1">
-                Discover the Hottest Fashion News and Trends Straight from the
-                Runway
+                {t("blog.relatedSubtitle")}
               </p>
             </div>
             <Swiper

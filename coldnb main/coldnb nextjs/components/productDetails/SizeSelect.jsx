@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const sizes = [
   { id: "values-s", value: "S", price: 79.99, disabled: false },
@@ -11,6 +12,7 @@ const sizes = [
 ];
 
 export default function SizeSelect() {
+  const { t } = useLanguage();
   const [selectedSize, setSelectedSize] = useState("L"); // Default value is "L"
 
   const handleChange = (value) => {
@@ -20,7 +22,7 @@ export default function SizeSelect() {
     <div className="variant-picker-item">
       <div className="d-flex justify-content-between mb_12">
         <div className="variant-picker-label">
-          selected size:
+          {t("product.selectedSize")}
           <span className="text-title variant-picker-label-value">
             {selectedSize}
           </span>
@@ -30,7 +32,7 @@ export default function SizeSelect() {
           data-bs-toggle="modal"
           className="size-guide text-title link"
         >
-          Size Guide
+          {t("product.sizeGuide")}
         </a>
       </div>
       <div className="variant-picker-values gap12">

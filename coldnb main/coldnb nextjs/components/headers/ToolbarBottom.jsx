@@ -1,7 +1,9 @@
 import Link from "next/link";
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ToolbarBottom() {
+  const { t } = useLanguage();
   return (
     <div className="tf-toolbar-bottom">
       <div className="toolbar-item">
@@ -21,7 +23,7 @@ export default function ToolbarBottom() {
               />
             </svg>
           </div>
-          <div className="toolbar-label">Shop</div>
+          <div className="toolbar-label">{t("toolbar.shop")}</div>
         </Link>
       </div>
       <div className="toolbar-item">
@@ -45,7 +47,7 @@ export default function ToolbarBottom() {
               />
             </svg>
           </div>
-          <div className="toolbar-label">Categories</div>
+          <div className="toolbar-label">{t("toolbar.categories")}</div>
         </a>
       </div>
       <div className="toolbar-item">
@@ -65,7 +67,7 @@ export default function ToolbarBottom() {
               />
             </svg>
           </div>
-          <div className="toolbar-label">Search</div>
+          <div className="toolbar-label">{t("toolbar.search")}</div>
         </a>
       </div>
       <div className="toolbar-item">
@@ -86,7 +88,7 @@ export default function ToolbarBottom() {
             </svg>
             {/* <div class="toolbar-count">1</div> */}
           </div>
-          <div className="toolbar-label">Wishlist</div>
+          <div className="toolbar-label">{t("toolbar.wishlist")}</div>
         </a>
       </div>
       <div className="toolbar-item">
@@ -109,7 +111,7 @@ export default function ToolbarBottom() {
               />
             </svg>
           </div>
-          <div className="toolbar-label">Cart</div>
+          <div className="toolbar-label">{t("toolbar.cart")}</div>
         </a>
       </div>
     </div>

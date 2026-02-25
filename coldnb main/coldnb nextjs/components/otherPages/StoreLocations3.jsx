@@ -1,6 +1,9 @@
+"use client";
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function StoreLocations3() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
@@ -25,30 +28,30 @@ export default function StoreLocations3() {
                 </div>
               </div>
               <div className="right">
-                <h4>Information</h4>
+                <h4>{t("storeLocations.information")}</h4>
                 <div className="mb_20">
-                  <div className="text-title mb_8">Phone:</div>
+                  <div className="text-title mb_8">{t("storeLocations.phoneLabel")}</div>
                   <p className="text-secondary">+1 666 234 8888</p>
                 </div>
                 <div className="mb_20">
-                  <div className="text-title mb_8">Email:</div>
-                  <p className="text-secondary">themesflat@gmail.com</p>
+                  <div className="text-title mb_8">{t("storeLocations.emailLabel")}</div>
+                  <p className="text-secondary">contato@coldnb.com.br</p>
                 </div>
                 <div className="mb_20">
-                  <div className="text-title mb_8">Address:</div>
+                  <div className="text-title mb_8">{t("storeLocations.addressLabel")}</div>
                   <p className="text-secondary">
                     2163 Phillips Gap Rd, West Jefferson, North Carolina, United
                     States
                   </p>
                 </div>
                 <div>
-                  <div className="text-title mb_8">Open Time:</div>
+                  <div className="text-title mb_8">{t("storeLocations.openTime")}</div>
                   <p className="mb_4 open-time">
-                    <span className="text-secondary">Mon - Sat:</span> 7:30am -
+                    <span className="text-secondary">{t("contact.monSat")}</span> 7:30am -
                     8:00pm PST
                   </p>
                   <p className="open-time">
-                    <span className="text-secondary">Sunday:</span> 9:00am -
+                    <span className="text-secondary">{t("contact.sunday")}</span> 9:00am -
                     5:00pm PST
                   </p>
                 </div>

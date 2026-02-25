@@ -1,30 +1,40 @@
 "use client";
 import { useContextElement } from "@/context/Context";
-import { allProducts } from "@/data/products";
+import { getProductsByIds } from "@/lib/shopApi";
 import Image from "next/image";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ProductCompare() {
+  const { t } = useLanguage();
   const {
     compareItem,
-
     addProductToCart,
     isAddedToCartProducts,
   } = useContextElement();
   const [items, setItems] = useState([]);
+
   useEffect(() => {
-    setItems([...allProducts.filter((elm) => compareItem.includes(elm.id))]);
+    if (compareItem.length === 0) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    getProductsByIds(compareItem).then((products) => {
+      if (!cancelled) setItems(products);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [compareItem]);
+
   return (
     <section className="flat-spacing">
       <div className="container">
         {!items.length ? (
           <div>
-            No items to compare yet. Add products to your comparison list and
-            decide smarter!{" "}
+            {t("comparePage.empty")}{" "}
             <Link className="btn-line" href="/shop-default-grid">
-              Explore Products
+              {t("wishlistPage.exploreProducts")}
             </Link>
           </div>
         ) : (
@@ -57,7 +67,7 @@ export default function ProductCompare() {
                         {elm.title}
                       </Link>
                       <p className="desc text-caption-1">
-                        Clothes, women, T-shirt
+                        {elm.category || ""}
                       </p>
                     </div>
                   </div>
@@ -67,80 +77,46 @@ export default function ProductCompare() {
 
             <div className="tf-compare-row">
               <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Rating</h6>
-              </div>
-              {items.map((elm, i) => (
-                <div
-                  key={i}
-                  className="tf-compare-col tf-compare-field tf-compare-rate"
-                >
-                  <div className="list-star">
-                    <span className="icon icon-star" />
-                    <span className="icon icon-star" />
-                    <span className="icon icon-star" />
-                    <span className="icon icon-star" />
-                    <span className="icon icon-star" />
-                  </div>
-                  <span>(1.234)</span>
-                </div>
-              ))}
-            </div>
-            <div className="tf-compare-row">
-              <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Price</h6>
-              </div>
-
-              {items.map((elm, i) => (
-                <div
-                  key={i}
-                  className="tf-compare-col tf-compare-field text-center"
-                >
-                  <span className="price">${elm.price.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-            <div className="tf-compare-row">
-              <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Type</h6>
+                <h6>{t("comparePage.price")}</h6>
               </div>
               {items.map((elm, i) => (
                 <div
                   key={i}
                   className="tf-compare-col tf-compare-field text-center"
                 >
-                  <span className="type">Jacket</span>
+                  <span className="price">R${elm.price.toFixed(2)}</span>
                 </div>
               ))}
             </div>
             <div className="tf-compare-row">
               <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Brand</h6>
+                <h6>{t("comparePage.brand")}</h6>
               </div>
               {items.map((elm, i) => (
                 <div
                   key={i}
                   className="tf-compare-col tf-compare-field text-center"
                 >
-                  <span className="brand">Gucci</span>
+                  <span className="brand">{elm.brand || "-"}</span>
                 </div>
               ))}
             </div>
             <div className="tf-compare-row">
               <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>size</h6>
+                <h6>{t("comparePage.size")}</h6>
               </div>
               {items.map((elm, i) => (
                 <div
                   key={i}
                   className="tf-compare-col tf-compare-field text-center"
                 >
-                  <span className="size">X, XS, L, M, XL</span>
+                  <span className="size">{elm.sizes?.join(", ") || "-"}</span>
                 </div>
               ))}
             </div>
             <div className="tf-compare-row">
               <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Color</h6>
+                <h6>{t("comparePage.color")}</h6>
               </div>
               {items.map((elm, i) => (
                 <div
@@ -148,31 +124,16 @@ export default function ProductCompare() {
                   className="tf-compare-col tf-compare-field text-center"
                 >
                   <div className="list-compare-color justify-content-center">
-                    <span className="item bg-pink" />
-                    <span className="item bg-yellow" />
-                    <span className="item bg-primary active" />
-                    <span className="item bg-success" />
-                    <span className="item bg-warning" />
+                    {elm.colors?.length > 0 ? elm.colors.map((c, ci) => (
+                      <span key={ci} className="item" style={{ backgroundColor: c.code || "#ccc" }} />
+                    )) : <span>-</span>}
                   </div>
                 </div>
               ))}
             </div>
             <div className="tf-compare-row">
               <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Metarial</h6>
-              </div>
-              {items.map((elm, i) => (
-                <div
-                  key={i}
-                  className="tf-compare-col tf-compare-field text-center"
-                >
-                  <span className="size">Cotton</span>
-                </div>
-              ))}
-            </div>
-            <div className="tf-compare-row">
-              <div className="tf-compare-col tf-compare-field d-md-block d-none">
-                <h6>Add To Cart</h6>
+                <h6>{t("comparePage.addToCart")}</h6>
               </div>
               {items.map((elm, i) => (
                 <div
@@ -181,11 +142,11 @@ export default function ProductCompare() {
                 >
                   <a
                     className="btn-view-cart"
-                    onClick={() => addProductToCart(elm.id)}
+                    onClick={() => addProductToCart(elm)}
                   >
                     {isAddedToCartProducts(elm.id)
-                      ? "Already Added"
-                      : "Add to Cart"}
+                      ? t("product.alreadyAdded")
+                      : t("comparePage.addToCart")}
                   </a>
                 </div>
               ))}

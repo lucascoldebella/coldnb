@@ -1,10 +1,12 @@
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function FilterMeta({ allProps, productLength }) {
+  const { t } = useLanguage();
   return (
     <div className="meta-filter-shop" style={{}}>
       <div id="product-count-grid" className="count-text">
-        <span className="count">{productLength}</span> Products Found
+        <span className="count">{productLength}</span> {t("shop.productsFound")}
       </div>
 
       <div id="applied-filters">
@@ -66,7 +68,7 @@ export default function FilterMeta({ allProps, productLength }) {
           className="remove-all-filters text-btn-uppercase"
           onClick={allProps.clearFilter}
         >
-          REMOVE ALL <i className="icon icon-close" />
+          {t("shop.removeAll")} <i className="icon icon-close" />
         </button>
       ) : (
         ""

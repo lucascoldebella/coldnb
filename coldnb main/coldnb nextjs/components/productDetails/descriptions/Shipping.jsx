@@ -1,50 +1,41 @@
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Shipping() {
+  const { t } = useLanguage();
   return (
     <>
       {" "}
       <div className="w-100">
-        <div className="text-btn-uppercase mb_12">We've got your back</div>
+        <div className="text-btn-uppercase mb_12">{t("productDescription.weveGotYourBack")}</div>
         <p className="mb_12">
-          One delivery fee to most locations (check our Orders &amp; Delivery
-          page)
+          {t("productDescription.oneDeliveryFee")}
         </p>
         <p className="">
-          Free returns within 14 days (excludes final sale and made-to-order
-          items, face masks and certain products containing hazardous or
-          flammable materials, such as fragrances and aerosols)
+          {t("productDescription.freeReturns14")}
         </p>
       </div>
       <div className="w-100">
         <div className="text-btn-uppercase mb_12">
-          Import duties information
+          {t("productDescription.importDuties")}
         </div>
         <p>
-          Let us handle the legwork. Delivery duties are included in the item
-          price when shipping to all EU countries (excluding the Canary
-          Islands), plus The United Kingdom, USA, Canada, China Mainland,
-          Australia, New Zealand, Puerto Rico, Switzerland, Singapore, Republic
-          Of Korea, Kuwait, Mexico, Qatar, India, Norway, Saudi Arabia, Taiwan
-          Region, Thailand, U.A.E., Japan, Brazil, Isle of Man, San Marino,
-          Colombia, Chile, Argentina, Egypt, Lebanon, Hong Kong SAR, Bahrain and
-          Turkey. All import duties are included in your order – the price you
-          see is the price you pay.
+          {t("productDescription.importDutiesDesc")}
         </p>
       </div>
       <div className="w-100">
-        <div className="text-btn-uppercase mb_12">Estimated delivery</div>
+        <div className="text-btn-uppercase mb_12">{t("productDescription.estimatedDeliveryLabel")}</div>
         <p className="mb_6 font-2">Express: May 10 - May 17</p>
         <p className="font-2">Sending from USA</p>
       </div>
       <div className="w-100">
-        <div className="text-btn-uppercase mb_12">Need more information?</div>
+        <div className="text-btn-uppercase mb_12">{t("productDescription.needMoreInfo")}</div>
         <div>
           <a
             href="#"
             className="link text-secondary text-decoration-underline mb_6 font-2"
           >
-            Orders &amp; delivery
+            {t("productDescription.ordersDelivery")}
           </a>
         </div>
         <div>
@@ -52,7 +43,7 @@ export default function Shipping() {
             href="#"
             className="link text-secondary text-decoration-underline mb_6 font-2"
           >
-            Returns &amp; refunds
+            {t("productDescription.returnsRefunds")}
           </a>
         </div>
         <div>
@@ -60,7 +51,7 @@ export default function Shipping() {
             href="#"
             className="link text-secondary text-decoration-underline font-2"
           >
-            Duties &amp; taxes
+            {t("productDescription.dutiesTaxes")}
           </a>
         </div>
       </div>

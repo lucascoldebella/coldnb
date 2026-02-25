@@ -5,7 +5,9 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Collections() {
+  const { t } = useLanguage();
   const params = {
     slidesPerView: 1,
     breakpoints: {
@@ -61,7 +63,7 @@ export default function Collections() {
                         href={`/shop-default-grid`}
                         className="btn-line style-white"
                       >
-                        Shop Now
+                        {t("homepage.shopNow")}
                       </Link>
                     </div>
                   </div>

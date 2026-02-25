@@ -4,8 +4,10 @@ import React, { useEffect } from "react";
 import Link from "next/link";
 import { products37 } from "@/data/products";
 import { useContextElement } from "@/context/Context";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function BannerTab({ parentClass = "flat-spacing pt-0" }) {
   const { setQuickViewItem } = useContextElement();
+  const { t } = useLanguage();
   useEffect(() => {
     const offsetX = 20;
     const offsetY = 20;
@@ -57,9 +59,9 @@ export default function BannerTab({ parentClass = "flat-spacing pt-0" }) {
             <div className="banner-left">
               <div className="box-title wow fadeInUp">
                 <h3>
-                  Turn Heads Everywhere: Discover The Latest Fall Collection
+                  {t("homepage.turnHeads")}
                 </h3>
-                <p>Browse our Top Trending: the hottest picks loved by all.</p>
+                <p>{t("homepage.browseTopTrending")}</p>
               </div>
               <ul className="tab-banner" role="tablist">
                 {products37.map((item) => (
@@ -79,7 +81,7 @@ export default function BannerTab({ parentClass = "flat-spacing pt-0" }) {
                       <h5 className="title text-line-clamp-1">{item.title}</h5>
                       <div className="arr-link">
                         <span className="text-btn-uppercase text-more">
-                          More
+                          {t("homepage.more")}
                         </span>
                         <i className="icon icon-arrowUpRight" />
                       </div>
@@ -97,7 +99,7 @@ export default function BannerTab({ parentClass = "flat-spacing pt-0" }) {
               </ul>
               <div className="wow fadeInUp">
                 <Link href={`/shop-collection`} className="btn-line">
-                  View All Collection
+                  {t("homepage.viewAllCollection")}
                 </Link>
               </div>
             </div>
@@ -149,7 +151,7 @@ export default function BannerTab({ parentClass = "flat-spacing pt-0" }) {
                           data-bs-toggle="modal"
                           className="cls-btn text-btn-uppercase"
                         >
-                          Quick View
+                          {t("product.quickView")}
                         </a>
                       </div>
                     </div>

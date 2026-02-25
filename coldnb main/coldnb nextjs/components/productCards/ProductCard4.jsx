@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useContextElement } from "@/context/Context";
 import CountdownTimer from "../common/Countdown";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function ProductCard4({ product }) {
   const [currentImage, setCurrentImage] = useState(product.imgSrc);
 
@@ -17,6 +18,8 @@ export default function ProductCard4({ product }) {
     addProductToCart,
     isAddedToCartProducts,
   } = useContextElement();
+
+  const { t } = useLanguage();
 
   useEffect(() => {
     setCurrentImage(product.imgSrc);
@@ -51,7 +54,7 @@ export default function ProductCard4({ product }) {
               <div className="initial-child-container">
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -59,7 +62,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -67,7 +70,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -75,7 +78,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -83,7 +86,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -95,7 +98,7 @@ export default function ProductCard4({ product }) {
               <div className="initial-child-container">
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -103,7 +106,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -111,7 +114,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -119,7 +122,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -127,7 +130,7 @@ export default function ProductCard4({ product }) {
                 </div>
                 <div className="marquee-child-item">
                   <p className="font-2 text-btn-uppercase fw-6 text-white">
-                    Hot Sale 25% OFF
+                    {t("product.hotSale")}
                   </p>
                 </div>
                 <div className="marquee-child-item">
@@ -181,8 +184,8 @@ export default function ProductCard4({ product }) {
             <span className="icon icon-heart" />
             <span className="tooltip">
               {isAddedtoWishlist(product.id)
-                ? "Already Wishlished"
-                : "Wishlist"}
+                ? t("product.alreadyWishlisted")
+                : t("product.wishlist")}
             </span>
           </a>
           <a
@@ -196,8 +199,8 @@ export default function ProductCard4({ product }) {
             <span className="tooltip">
               {" "}
               {isAddedtoCompareItem(product.id)
-                ? "Already compared"
-                : "Compare"}
+                ? t("product.alreadyCompared")
+                : t("product.compare")}
             </span>
           </a>
           <a
@@ -207,7 +210,7 @@ export default function ProductCard4({ product }) {
             className="box-icon quickview tf-btn-loading"
           >
             <span className="icon icon-eye" />
-            <span className="tooltip">Quick View</span>
+            <span className="tooltip">{t("product.quickView")}</span>
           </a>
         </div>
         <div className="list-btn-main">
@@ -215,11 +218,11 @@ export default function ProductCard4({ product }) {
             href="#shoppingCart"
             data-bs-toggle="modal"
             className="btn-main-product"
-            onClick={() => addProductToCart(product.id)}
+            onClick={() => addProductToCart(product)}
           >
             {isAddedToCartProducts(product.id)
-              ? "Already Added"
-              : "ADD TO CART"}
+              ? t("product.alreadyAdded")
+              : t("product.addToCart")}
           </a>
         </div>
       </div>

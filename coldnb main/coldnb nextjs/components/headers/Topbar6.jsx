@@ -15,7 +15,7 @@ export default function Topbar6({ bgColor = "bg-blue-2" }) {
             </li>
             <li>
               <a className="text-caption-1 text-white" href="#">
-                themesflat@gmail.com
+                contato@coldnb.com.br
               </a>
             </li>
             <li>

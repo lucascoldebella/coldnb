@@ -1,0 +1,529 @@
+#!/bin/bash
+#
+# coldnb-admin - Coldnb Product Management CLI
+#
+# Lean, efficient admin tool for managing products via the C backend API.
+# Stores JWT token in ~/.coldnb_token for session persistence.
+#
+# Usage: coldnb-admin <command> [options]
+#
+
+set -e
+
+# Configuration
+API_BASE="${COLDNB_API:-http://localhost:8080}"
+TOKEN_FILE="$HOME/.coldnb_token"
+CREDENTIALS_FILE="$HOME/.coldnb_credentials"
+
+# Colors (disable with NO_COLOR=1)
+if [ -z "$NO_COLOR" ] && [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[0;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+else
+    RED='' GREEN='' YELLOW='' BLUE='' NC=''
+fi
+
+# Print functions
+err() { echo -e "${RED}Error:${NC} $*" >&2; }
+ok() { echo -e "${GREEN}$*${NC}"; }
+info() { echo -e "${BLUE}$*${NC}"; }
+warn() { echo -e "${YELLOW}$*${NC}"; }
+
+# Get stored token
+get_token() {
+    if [ -f "$TOKEN_FILE" ]; then
+        cat "$TOKEN_FILE"
+    else
+        err "Not logged in. Run: coldnb-admin login"
+        exit 1
+    fi
+}
+
+# API request helper
+api() {
+    local method="$1"
+    local endpoint="$2"
+    local data="$3"
+    local token
+
+    local args=(-s -w "\n%{http_code}" -X "$method")
+    args+=(-H "Content-Type: application/json")
+
+    # Add auth header if token exists
+    if [ -f "$TOKEN_FILE" ]; then
+        token=$(cat "$TOKEN_FILE")
+        args+=(-H "Authorization: Bearer $token")
+    fi
+
+    # Add body if provided
+    if [ -n "$data" ]; then
+        args+=(-d "$data")
+    fi
+
+    local response
+    response=$(curl "${args[@]}" "${API_BASE}${endpoint}")
+
+    local body http_code
+    http_code=$(echo "$response" | tail -n1)
+    body=$(echo "$response" | sed '$d')
+
+    # Check for errors
+    if [ "$http_code" -ge 400 ]; then
+        local error_msg
+        error_msg=$(echo "$body" | jq -r '.message // .error // "Request failed"' 2>/dev/null || echo "Request failed")
+        err "$error_msg (HTTP $http_code)"
+        return 1
+    fi
+
+    echo "$body"
+}
+
+# Commands
+cmd_login() {
+    local username password
+
+    # Check for saved credentials
+    if [ -f "$CREDENTIALS_FILE" ]; then
+        source "$CREDENTIALS_FILE"
+    fi
+
+    # Prompt if not set
+    if [ -z "$COLDNB_USER" ]; then
+        read -rp "Username: " username
+    else
+        username="$COLDNB_USER"
+        info "Using saved username: $username"
+    fi
+
+    if [ -z "$COLDNB_PASS" ]; then
+        read -rsp "Password: " password
+        echo
+    else
+        password="$COLDNB_PASS"
+    fi
+
+    local response
+    response=$(api POST "/api/admin/login" "{\"username\":\"$username\",\"password\":\"$password\"}") || exit 1
+
+    local token expires_at
+    token=$(echo "$response" | jq -r '.data.token')
+    expires_at=$(echo "$response" | jq -r '.data.expires_at')
+
+    if [ "$token" = "null" ] || [ -z "$token" ]; then
+        err "Login failed - invalid response"
+        exit 1
+    fi
+
+    echo "$token" > "$TOKEN_FILE"
+    chmod 600 "$TOKEN_FILE"
+
+    local expires_date
+    expires_date=$(date -d "@$expires_at" 2>/dev/null || date -r "$expires_at" 2>/dev/null || echo "unknown")
+
+    ok "Login successful!"
+    info "Token expires: $expires_date"
+    info "Token saved to: $TOKEN_FILE"
+}
+
+cmd_logout() {
+    if [ -f "$TOKEN_FILE" ]; then
+        api POST "/api/admin/logout" "" >/dev/null 2>&1 || true
+        rm -f "$TOKEN_FILE"
+        ok "Logged out successfully"
+    else
+        warn "Not logged in"
+    fi
+}
+
+cmd_list() {
+    local page="${1:-1}"
+    local limit="${2:-20}"
+
+    local response
+    response=$(api GET "/api/admin/products?page=$page&limit=$limit&show_inactive=true") || exit 1
+
+    echo "$response" | jq -r '
+        .data.products[] |
+        "\(.id)\t\(.name)\t$\(.price)\tStock: \(.stock_quantity)\t\(if .is_active then "Active" else "Inactive" end)"
+    ' | column -t -s $'\t'
+
+    local total current_page total_pages
+    total=$(echo "$response" | jq -r '.data.pagination.total')
+    current_page=$(echo "$response" | jq -r '.data.pagination.page')
+    total_pages=$(echo "$response" | jq -r '.data.pagination.total_pages')
+
+    echo
+    info "Page $current_page of $total_pages ($total total products)"
+}
+
+cmd_get() {
+    local id="$1"
+
+    if [ -z "$id" ]; then
+        err "Usage: coldnb-admin get <product_id>"
+        exit 1
+    fi
+
+    local response
+    response=$(api GET "/api/admin/products/$id") || exit 1
+
+    echo "$response" | jq '.data'
+}
+
+cmd_create() {
+    info "Create New Product"
+    info "=================="
+    echo
+
+    local name slug description short_desc sku price compare_price
+    local category_id brand stock is_active is_featured is_new is_sale
+
+    # Required
+    read -rp "Name (required): " name
+    if [ -z "$name" ]; then
+        err "Name is required"
+        exit 1
+    fi
+
+    # Optional with defaults
+    read -rp "Slug (auto-generated if empty): " slug
+    read -rp "Description: " description
+    read -rp "Short description: " short_desc
+    read -rp "SKU: " sku
+    read -rp "Price [0.00]: " price
+    price="${price:-0}"
+    read -rp "Compare at price (original): " compare_price
+
+    # Category selection
+    echo
+    info "Categories:"
+    api GET "/api/categories" | jq -r '.data[] | "  \(.id)) \(.name)"' 2>/dev/null || echo "  (none)"
+    read -rp "Category ID: " category_id
+
+    read -rp "Brand: " brand
+    read -rp "Stock quantity [0]: " stock
+    stock="${stock:-0}"
+
+    # Flags
+    echo
+    read -rp "Active (show on website)? [Y/n]: " is_active
+    is_active=$([ "$is_active" != "n" ] && [ "$is_active" != "N" ] && echo "true" || echo "false")
+
+    read -rp "Featured (homepage)? [y/N]: " is_featured
+    is_featured=$([ "$is_featured" = "y" ] || [ "$is_featured" = "Y" ] && echo "true" || echo "false")
+
+    read -rp "Mark as New? [y/N]: " is_new
+    is_new=$([ "$is_new" = "y" ] || [ "$is_new" = "Y" ] && echo "true" || echo "false")
+
+    read -rp "Mark as Sale? [y/N]: " is_sale
+    is_sale=$([ "$is_sale" = "y" ] || [ "$is_sale" = "Y" ] && echo "true" || echo "false")
+
+    # Build JSON
+    local json
+    json=$(jq -n \
+        --arg name "$name" \
+        --arg slug "$slug" \
+        --arg desc "$description" \
+        --arg short "$short_desc" \
+        --arg sku "$sku" \
+        --argjson price "$price" \
+        --arg compare "$compare_price" \
+        --arg cat "$category_id" \
+        --arg brand "$brand" \
+        --argjson stock "$stock" \
+        --argjson active "$is_active" \
+        --argjson featured "$is_featured" \
+        --argjson new "$is_new" \
+        --argjson sale "$is_sale" \
+        '{
+            name: $name,
+            price: $price,
+            stock_quantity: $stock,
+            is_active: $active,
+            is_featured: $featured,
+            is_new: $new,
+            is_sale: $sale
+        }
+        + (if $slug != "" then {slug: $slug} else {} end)
+        + (if $desc != "" then {description: $desc} else {} end)
+        + (if $short != "" then {short_description: $short} else {} end)
+        + (if $sku != "" then {sku: $sku} else {} end)
+        + (if $compare != "" then {compare_at_price: ($compare | tonumber)} else {} end)
+        + (if $cat != "" then {category_id: ($cat | tonumber)} else {} end)
+        + (if $brand != "" then {brand: $brand} else {} end)
+        ')
+
+    echo
+    info "Creating product..."
+
+    local response
+    response=$(api POST "/api/admin/products" "$json") || exit 1
+
+    local product_id
+    product_id=$(echo "$response" | jq -r '.data.id')
+
+    ok "Product created successfully!"
+    info "Product ID: $product_id"
+
+    # Offer to add images
+    echo
+    read -rp "Add images now? [y/N]: " add_images
+    if [ "$add_images" = "y" ] || [ "$add_images" = "Y" ]; then
+        cmd_image "$product_id"
+    fi
+}
+
+cmd_update() {
+    local id="$1"
+
+    if [ -z "$id" ]; then
+        read -rp "Product ID to update: " id
+    fi
+
+    if [ -z "$id" ]; then
+        err "Product ID is required"
+        exit 1
+    fi
+
+    # Get current product
+    info "Fetching current product data..."
+    local current
+    current=$(api GET "/api/admin/products/$id") || exit 1
+
+    echo
+    echo "$current" | jq -r '.data | "Current: \(.name) - $\(.price) - Stock: \(.stock_quantity)"'
+    echo
+
+    info "Enter new values (leave empty to keep current):"
+
+    local name price stock is_active is_featured is_sale
+    read -rp "Name: " name
+    read -rp "Price: " price
+    read -rp "Stock quantity: " stock
+    read -rp "Active [y/n]: " is_active
+    read -rp "Featured [y/n]: " is_featured
+    read -rp "Sale [y/n]: " is_sale
+
+    # Build JSON with only provided fields
+    local json="{}"
+    [ -n "$name" ] && json=$(echo "$json" | jq --arg v "$name" '. + {name: $v}')
+    [ -n "$price" ] && json=$(echo "$json" | jq --argjson v "$price" '. + {price: $v}')
+    [ -n "$stock" ] && json=$(echo "$json" | jq --argjson v "$stock" '. + {stock_quantity: $v}')
+    [ "$is_active" = "y" ] && json=$(echo "$json" | jq '. + {is_active: true}')
+    [ "$is_active" = "n" ] && json=$(echo "$json" | jq '. + {is_active: false}')
+    [ "$is_featured" = "y" ] && json=$(echo "$json" | jq '. + {is_featured: true}')
+    [ "$is_featured" = "n" ] && json=$(echo "$json" | jq '. + {is_featured: false}')
+    [ "$is_sale" = "y" ] && json=$(echo "$json" | jq '. + {is_sale: true}')
+    [ "$is_sale" = "n" ] && json=$(echo "$json" | jq '. + {is_sale: false}')
+
+    if [ "$json" = "{}" ]; then
+        warn "No changes specified"
+        exit 0
+    fi
+
+    local response
+    response=$(api PUT "/api/admin/products/$id" "$json") || exit 1
+
+    ok "Product updated successfully!"
+}
+
+cmd_delete() {
+    local id="$1"
+
+    if [ -z "$id" ]; then
+        read -rp "Product ID to delete: " id
+    fi
+
+    if [ -z "$id" ]; then
+        err "Product ID is required"
+        exit 1
+    fi
+
+    # Get product name for confirmation
+    local current name
+    current=$(api GET "/api/admin/products/$id") || exit 1
+    name=$(echo "$current" | jq -r '.data.name')
+
+    warn "This will deactivate product: $name (ID: $id)"
+    read -rp "Are you sure? [y/N]: " confirm
+
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        info "Cancelled"
+        exit 0
+    fi
+
+    api DELETE "/api/admin/products/$id" >/dev/null || exit 1
+
+    ok "Product deleted (soft delete - marked inactive)"
+}
+
+cmd_image() {
+    local product_id="$1"
+
+    if [ -z "$product_id" ]; then
+        read -rp "Product ID: " product_id
+    fi
+
+    if [ -z "$product_id" ]; then
+        err "Product ID is required"
+        exit 1
+    fi
+
+    info "Add Image to Product $product_id"
+    echo
+
+    local url alt_text is_primary sort_order
+
+    read -rp "Image URL or path (e.g., /images/products/img.jpg): " url
+    if [ -z "$url" ]; then
+        err "URL is required"
+        exit 1
+    fi
+
+    read -rp "Alt text: " alt_text
+    read -rp "Primary image? [y/N]: " is_primary
+    is_primary=$([ "$is_primary" = "y" ] || [ "$is_primary" = "Y" ] && echo "true" || echo "false")
+    read -rp "Sort order [0]: " sort_order
+    sort_order="${sort_order:-0}"
+
+    local json
+    json=$(jq -n \
+        --arg url "$url" \
+        --arg alt "$alt_text" \
+        --argjson primary "$is_primary" \
+        --argjson sort "$sort_order" \
+        '{url: $url, is_primary: $primary, sort_order: $sort}
+        + (if $alt != "" then {alt_text: $alt} else {} end)')
+
+    local response
+    response=$(api POST "/api/admin/products/$product_id/images" "$json") || exit 1
+
+    local image_id
+    image_id=$(echo "$response" | jq -r '.data.id')
+
+    ok "Image added successfully!"
+    info "Image ID: $image_id"
+
+    # Ask to add more
+    echo
+    read -rp "Add another image? [y/N]: " add_more
+    if [ "$add_more" = "y" ] || [ "$add_more" = "Y" ]; then
+        cmd_image "$product_id"
+    fi
+}
+
+cmd_categories() {
+    local response
+    response=$(api GET "/api/categories") || exit 1
+
+    echo
+    info "Available Categories:"
+    echo "$response" | jq -r '.data[] | "  \(.id)) \(.name) (\(.slug))"'
+}
+
+cmd_quick() {
+    # Quick add - minimal prompts for fast product creation
+    local name="$1"
+    local price="$2"
+    local stock="${3:-10}"
+    local category="${4:-}"
+
+    if [ -z "$name" ] || [ -z "$price" ]; then
+        err "Usage: coldnb-admin quick <name> <price> [stock] [category_id]"
+        exit 1
+    fi
+
+    local json
+    json=$(jq -n \
+        --arg name "$name" \
+        --argjson price "$price" \
+        --argjson stock "$stock" \
+        --arg cat "$category" \
+        '{
+            name: $name,
+            price: $price,
+            stock_quantity: $stock,
+            is_active: true
+        }
+        + (if $cat != "" then {category_id: ($cat | tonumber)} else {} end)')
+
+    local response
+    response=$(api POST "/api/admin/products" "$json") || exit 1
+
+    local product_id
+    product_id=$(echo "$response" | jq -r '.data.id')
+
+    ok "Created: $name (ID: $product_id)"
+}
+
+cmd_help() {
+    cat << 'EOF'
+coldnb-admin - Coldnb Product Management CLI
+
+USAGE:
+    coldnb-admin <command> [options]
+
+COMMANDS:
+    login              Authenticate and store JWT token
+    logout             Clear stored token
+    list [page] [limit] List products (default: page 1, 20 items)
+    get <id>           Get product details
+    create             Create product (interactive)
+    quick <name> <price> [stock] [category]
+                       Quick create with minimal input
+    update [id]        Update product (interactive)
+    delete [id]        Soft delete product
+    image [product_id] Add image to product
+    categories         List available categories
+    help               Show this help
+
+ENVIRONMENT:
+    COLDNB_API         API base URL (default: http://localhost:8080)
+    NO_COLOR           Disable colored output
+
+FILES:
+    ~/.coldnb_token    Cached JWT token
+    ~/.coldnb_credentials  Optional saved credentials (source file)
+
+EXAMPLES:
+    coldnb-admin login
+    coldnb-admin list
+    coldnb-admin quick "Gold Ring" 199.99 25 2
+    coldnb-admin create
+    coldnb-admin image 1
+    coldnb-admin update 1
+
+DOCS:
+    /home/lucas/coldnb/coldnb-backend/docs/ADMIN_PRODUCT_MANAGEMENT.txt
+EOF
+}
+
+# Main
+main() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+
+    case "$cmd" in
+        login)      cmd_login "$@" ;;
+        logout)     cmd_logout "$@" ;;
+        list|ls)    cmd_list "$@" ;;
+        get|show)   cmd_get "$@" ;;
+        create|new) cmd_create "$@" ;;
+        quick|q)    cmd_quick "$@" ;;
+        update|edit) cmd_update "$@" ;;
+        delete|rm)  cmd_delete "$@" ;;
+        image|img)  cmd_image "$@" ;;
+        categories|cat) cmd_categories "$@" ;;
+        help|-h|--help) cmd_help ;;
+        *)
+            err "Unknown command: $cmd"
+            echo "Run 'coldnb-admin help' for usage"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

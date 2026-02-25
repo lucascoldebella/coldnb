@@ -1,300 +1,129 @@
 "use client";
 import Link from "next/link";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { products } from "@/data/products";
+import { getProducts } from "@/lib/shopApi";
 import { Swiper, SwiperSlide } from "swiper/react";
 import ProductCard1 from "../productCards/ProductCard1";
-import {
-  blogLinks,
-  demoItems,
-  otherPageLinks,
-  otherShopMenus,
-  productFeatures,
-  productLinks,
-  productStyles,
-  shopFeatures,
-  shopLayout,
-  swatchLinks,
-} from "@/data/menu";
+import useNavigationData from "@/lib/hooks/useNavigationData";
 import { usePathname } from "next/navigation";
-export default function Nav() {
-  const pathname = usePathname();
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
+/* Collect all items from a menu for active-state matching */
+function getAllItems(menu) {
+  if (!menu || !menu.groups) return [];
+  const items = [];
+  for (const group of menu.groups) {
+    for (const item of group.items || []) {
+      items.push(item);
+    }
+  }
+  return items;
+}
+
+function isActive(items, pathname) {
+  return items.some((item) => item.href.split("/")[1] === pathname.split("/")[1]);
+}
+
+/* ---- Mega Grid Menu (Inicio) ---- */
+function MegaGridMenu({ menu, pathname, t }) {
+  const items = getAllItems(menu);
   return (
-    <>
-      {" "}
-      <li
-        className={`menu-item ${
-          [...demoItems].some(
-            (elm) => elm.href.split("/")[1] == pathname.split("/")[1]
-          )
-            ? "active"
-            : ""
-        } `}
-      >
-        <a href="#" className="item-link">
-          Home
-          <i className="icon icon-arrow-down" />
-        </a>
-        <div className="sub-menu mega-menu">
-          <div className="container">
-            <div className="row-demo">
-              {demoItems.slice(0, 12).map((item, index) => (
-                <div
-                  className={`demo-item ${
-                    pathname.split("/")[1] === item.href.split("/")[1]
-                      ? "active"
-                      : ""
-                  }`}
-                  key={item.href}
-                >
-                  <Link href={item.href}>
-                    <div className="demo-image position-relative">
+    <li className={`menu-item ${isActive(items, pathname) ? "active" : ""}`}>
+      <a href="#" className="item-link">
+        {t(menu.translation_key || "nav.home")}
+        <i className="icon icon-arrow-down" />
+      </a>
+      <div className="sub-menu mega-menu">
+        <div className="container">
+          <div className="row-demo">
+            {items.slice(0, 12).map((item) => (
+              <div
+                className={`demo-item ${pathname.split("/")[1] === item.href.split("/")[1] ? "active" : ""}`}
+                key={item.id || item.href}
+              >
+                <Link href={item.href}>
+                  <div className="demo-image position-relative">
+                    {item.image_url && (
                       <Image
                         className="lazyload"
-                        data-src={item.src}
-                        alt={item.alt}
-                        src={item.src}
+                        data-src={item.image_url}
+                        alt={item.image_alt || item.label}
+                        src={item.image_url}
                         width={273}
                         height={300}
                       />
-                      {item.label.length > 0 && (
-                        <div className="demo-label">
-                          {item.label.map((label, labelIndex) => (
-                            <span
-                              key={labelIndex}
-                              className={`demo-${label.toLowerCase()}`}
-                            >
-                              {label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <span className="demo-name">{item.name}</span>
-                  </Link>
-                </div>
-              ))}
-            </div>
+                    )}
+                    {item.badge && (
+                      <div className="demo-label">
+                        <span className={`demo-${item.badge.toLowerCase()}`}>{item.badge}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="demo-name">{item.label}</span>
+                </Link>
+              </div>
+            ))}
+          </div>
+          {items.length > 12 && (
             <div className="text-center view-all-demo">
               <a href="#modalDemo" data-bs-toggle="modal" className="tf-btn">
-                <span className="text">View All Demos</span>
+                <span className="text">{t("nav.viewAllDemos")}</span>
               </a>
             </div>
-          </div>
+          )}
         </div>
-      </li>
-      <li
-        className={`menu-item ${
-          [
-            ...shopLayout,
-            ...shopFeatures,
-            ...productStyles,
-            ...otherShopMenus,
-          ].some((elm) => elm.href.split("/")[1] == pathname.split("/")[1])
-            ? "active"
-            : ""
-        } `}
-      >
-        <a href="#" className="item-link">
-          Shop
-          <i className="icon icon-arrow-down" />
-        </a>
-        <div className="sub-menu mega-menu">
-          <div className="container">
-            <div className="row">
-              <div className="col-lg-2">
+      </div>
+    </li>
+  );
+}
+
+/* ---- Mega Columns Menu (Loja, Produtos) ---- */
+function MegaColumnsMenu({ menu, pathname, t, navProducts }) {
+  const items = getAllItems(menu);
+  const groups = menu.groups || [];
+  const showProducts = menu.show_products;
+  const hasBanner = !!menu.banner_image_url;
+
+  // Calculate column width based on number of groups + extras
+  const groupCount = groups.length;
+  const extraCols = (showProducts ? 1 : 0) + (hasBanner ? 1 : 0);
+  const totalCols = groupCount + extraCols;
+  const groupColSize = totalCols <= 4 ? Math.floor(12 / totalCols) : 2;
+  const productColSize = showProducts ? 4 : 0;
+  const bannerColSize = hasBanner ? (12 - groupCount * groupColSize) : 0;
+
+  return (
+    <li className={`menu-item ${isActive(items, pathname) ? "active" : ""}`}>
+      <a href="#" className="item-link">
+        {t(menu.translation_key || menu.name)}
+        <i className="icon icon-arrow-down" />
+      </a>
+      <div className="sub-menu mega-menu">
+        <div className="container">
+          <div className="row">
+            {groups.map((group) => (
+              <div key={group.id} className={`col-lg-${showProducts ? 2 : groupColSize}`}>
                 <div className="mega-menu-item">
-                  <div className="menu-heading">Shop Layout</div>
+                  {group.title && (
+                    <div className="menu-heading">
+                      {group.translation_key ? t(group.translation_key) : group.title}
+                    </div>
+                  )}
                   <ul className="menu-list">
-                    {shopLayout.map((link, index) => (
+                    {(group.items || []).map((item) => (
                       <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={link.href} className="menu-link-text">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-2">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">Shop Features</div>
-                  <ul className="menu-list">
-                    {shopFeatures.map((link, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={link.href} className="menu-link-text">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-2">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">Products Hover</div>
-                  <ul className="menu-list">
-                    {productStyles.map((style, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == style.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={style.href} className="menu-link-text">
-                          {style.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-2">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">My Pages</div>
-                  <ul className="menu-list">
-                    {otherShopMenus.map((link, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={link.href} className="menu-link-text">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-4">
-                <div className="wrapper-sub-shop">
-                  <div className="menu-heading">Recent Products</div>
-                  <Swiper
-                    dir="ltr"
-                    className="swiper tf-product-header"
-                    slidesPerView={2}
-                    spaceBetween={20}
-                  >
-                    {products
-                      .slice(0, 4)
-                      .map((elm) => ({
-                        ...elm,
-                        colors: null,
-                      }))
-                      .map((elm, i) => (
-                        <SwiperSlide key={i} className="swiper-slide">
-                          <ProductCard1 product={elm} />
-                        </SwiperSlide>
-                      ))}
-                  </Swiper>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </li>
-      <li
-        className={`menu-item ${
-          [...productLinks, ...swatchLinks, ...productFeatures].some(
-            (elm) => elm.href.split("/")[1] == pathname.split("/")[1]
-          )
-            ? "active"
-            : ""
-        } `}
-      >
-        <a href="#" className="item-link">
-          Products
-          <i className="icon icon-arrow-down" />
-        </a>
-        <div className="sub-menu mega-menu">
-          <div className="container">
-            <div className="row">
-              <div className="col-lg-3">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">Products Layout</div>
-                  <ul className="menu-list">
-                    {productLinks.map((link, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={link.href} className="menu-link-text">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-3">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">Colors Swatched</div>
-                  <ul className="menu-list">
-                    {swatchLinks.map((link, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
-                      >
-                        <Link href={link.href} className="menu-link-text">
-                          {link.name}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <div className="col-lg-3">
-                <div className="mega-menu-item">
-                  <div className="menu-heading">Products Features</div>
-                  <ul className="menu-list">
-                    {productFeatures.map((link, index) => (
-                      <li
-                        key={index}
-                        className={`menu-item-li ${
-                          pathname.split("/")[1] == link.href.split("/")[1]
-                            ? "active"
-                            : ""
-                        } `}
+                        key={item.id || item.href}
+                        className={`menu-item-li ${pathname.split("/")[1] === item.href.split("/")[1] ? "active" : ""}`}
                       >
                         <Link
-                          href={link.href}
-                          className={`menu-link-text ${
-                            link.badge ? "position-relative" : ""
-                          } `}
+                          href={item.href}
+                          className={`menu-link-text ${item.badge ? "position-relative" : ""}`}
                         >
-                          {link.name}
-                          {link.badge && (
+                          {item.label}
+                          {item.badge && (
                             <div className="demo-label">
-                              <span className="demo-new">{link.badge}</span>
+                              <span className="demo-new">{item.badge}</span>
                             </div>
                           )}
                         </Link>
@@ -303,16 +132,45 @@ export default function Nav() {
                   </ul>
                 </div>
               </div>
-              <div className="col-lg-3">
-                <div className="menu-heading">Best seller</div>
+            ))}
+
+            {/* Product carousel (Loja) */}
+            {showProducts && navProducts.length > 0 && (
+              <div className={`col-lg-${productColSize}`}>
+                <div className="wrapper-sub-shop">
+                  <div className="menu-heading">{t("nav.recentProducts")}</div>
+                  <Swiper
+                    dir="ltr"
+                    className="swiper tf-product-header"
+                    slidesPerView={2}
+                    spaceBetween={20}
+                  >
+                    {navProducts
+                      .map((elm) => ({ ...elm, colors: null }))
+                      .map((elm, i) => (
+                        <SwiperSlide key={i} className="swiper-slide">
+                          <ProductCard1 product={elm} />
+                        </SwiperSlide>
+                      ))}
+                  </Swiper>
+                </div>
+              </div>
+            )}
+
+            {/* Banner column (Produtos) */}
+            {hasBanner && !showProducts && (
+              <div className={`col-lg-${bannerColSize}`}>
+                <div className="menu-heading">
+                  {menu.banner_title ? t(menu.banner_title) : t("nav.bestSeller")}
+                </div>
                 <div className="sec-cls-header">
                   <div className="collection-position hover-img">
-                    <Link href={`/shop-collection`} className="img-style">
+                    <Link href={menu.banner_link || "/shop-collection"} className="img-style">
                       <Image
                         className="lazyload"
-                        data-src="/images/collections/cls-header.jpg"
+                        data-src={menu.banner_image_url}
                         alt="banner-cls"
-                        src="/images/collections/cls-header.jpg"
+                        src={menu.banner_image_url}
                         width={300}
                         height={400}
                       />
@@ -320,23 +178,17 @@ export default function Nav() {
                     <div className="content">
                       <div className="title-top">
                         <h4 className="title">
-                          <Link
-                            href={`/shop-collection`}
-                            className="link text-white wow fadeInUp"
-                          >
-                            Shop our top picks
+                          <Link href={menu.banner_link || "/shop-collection"} className="link text-white wow fadeInUp">
+                            {t("nav.shopOurTopPicks")}
                           </Link>
                         </h4>
                         <p className="desc text-white wow fadeInUp">
-                          Reserved for special occasions
+                          {t("nav.reservedForSpecial")}
                         </p>
                       </div>
                       <div>
-                        <Link
-                          href={`/shop-collection`}
-                          className="tf-btn btn-md btn-white"
-                        >
-                          <span className="text">Shop Now</span>
+                        <Link href={menu.banner_link || "/shop-collection"} className="tf-btn btn-md btn-white">
+                          <span className="text">{t("nav.shopNow")}</span>
                           <i className="icon icon-arrowUpRight" />
                         </Link>
                       </div>
@@ -344,79 +196,73 @@ export default function Nav() {
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
-      </li>
-      <li
-        className={`menu-item position-relative ${
-          [...blogLinks].some(
-            (elm) => elm.href.split("/")[1] == pathname.split("/")[1]
-          )
-            ? "active"
-            : ""
-        } `}
-      >
-        <a href="#" className="item-link">
-          Blog
-          <i className="icon icon-arrow-down" />
-        </a>
-        <div className="sub-menu submenu-default">
-          <ul className="menu-list">
-            {blogLinks.map((link, index) => (
-              <li
-                key={index}
-                className={`menu-item-li ${
-                  pathname.split("/")[1] == link.href.split("/")[1]
-                    ? "active"
-                    : ""
-                } `}
-              >
-                <Link href={link.href} className="menu-link-text">
-                  {link.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </li>
-      <li
-        className={`menu-item position-relative ${
-          [...otherPageLinks].some(
-            (elm) => elm.href.split("/")[1] == pathname.split("/")[1]
-          )
-            ? "active"
-            : ""
-        } `}
-      >
-        <a href="#" className="item-link">
-          Pages
-          <i className="icon icon-arrow-down" />
-        </a>
-        <div className="sub-menu submenu-default">
-          <ul className="menu-list">
-            {otherPageLinks.map((link, index) => (
-              <li
-                key={index}
-                className={`menu-item-li ${
-                  pathname.split("/")[1] == link.href.split("/")[1]
-                    ? "active"
-                    : ""
-                } `}
-              >
-                <Link href={link.href} className="menu-link-text">
-                  {link.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </li>
-      <li className="menu-item">
-        <a href="https://themeforest.net/user/themesflat" className="item-link">
-          Buy Theme
-        </a>
-      </li>
+      </div>
+    </li>
+  );
+}
+
+/* ---- Simple Dropdown Menu (Blog, Paginas) ---- */
+function SimpleMenu({ menu, pathname, t }) {
+  const items = getAllItems(menu);
+  return (
+    <li className={`menu-item position-relative ${isActive(items, pathname) ? "active" : ""}`}>
+      <a href="#" className="item-link">
+        {t(menu.translation_key || menu.name)}
+        <i className="icon icon-arrow-down" />
+      </a>
+      <div className="sub-menu submenu-default">
+        <ul className="menu-list">
+          {items.map((item) => (
+            <li
+              key={item.id || item.href}
+              className={`menu-item-li ${pathname.split("/")[1] === item.href.split("/")[1] ? "active" : ""}`}
+            >
+              <Link href={item.href} className="menu-link-text">
+                {item.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </li>
+  );
+}
+
+export default function Nav() {
+  const pathname = usePathname();
+  const { t } = useLanguage();
+  const { menusBySlug } = useNavigationData();
+  const [navProducts, setNavProducts] = useState([]);
+
+  useEffect(() => {
+    getProducts({ per_page: 4 })
+      .then((res) => setNavProducts(res.products || []))
+      .catch(() => {});
+  }, []);
+
+  // Render menus in order: inicio, loja, produtos, blog, paginas
+  const menuOrder = ["inicio", "loja", "produtos", "blog", "paginas"];
+
+  return (
+    <>
+      {menuOrder.map((slug) => {
+        const menu = menusBySlug[slug];
+        if (!menu) return null;
+
+        switch (menu.menu_type) {
+          case "mega_grid":
+            return <MegaGridMenu key={slug} menu={menu} pathname={pathname} t={t} />;
+          case "mega_columns":
+            return <MegaColumnsMenu key={slug} menu={menu} pathname={pathname} t={t} navProducts={navProducts} />;
+          case "simple":
+            return <SimpleMenu key={slug} menu={menu} pathname={pathname} t={t} />;
+          default:
+            return <SimpleMenu key={slug} menu={menu} pathname={pathname} t={t} />;
+        }
+      })}
     </>
   );
 }

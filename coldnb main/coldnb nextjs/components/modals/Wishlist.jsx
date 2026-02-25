@@ -3,20 +3,39 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useContextElement } from "@/context/Context";
-import { allProducts } from "@/data/products";
+import { getProductsByIds } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Wishlist() {
+  const { t } = useLanguage();
   const { removeFromWishlist, wishList } = useContextElement();
   const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+
   useEffect(() => {
-    setItems([...allProducts.filter((elm) => wishList.includes(elm.id))]);
+    if (wishList.length === 0) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    getProductsByIds(wishList).then((products) => {
+      if (!cancelled) {
+        setItems(products);
+        setLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
   }, [wishList]);
+
   return (
     <div className="modal fullRight fade modal-wishlist" id="wishlist">
       <div className="modal-dialog">
         <div className="modal-content">
           <div className="header">
-            <h5 className="title">Wish List</h5>
+            <h5 className="title">{t("wishlistPage.title")}</h5>
             <span
               className="icon-close icon-close-popup"
               data-bs-dismiss="modal"
@@ -26,7 +45,11 @@ export default function Wishlist() {
             <div className="tf-mini-cart-wrap">
               <div className="tf-mini-cart-main">
                 <div className="tf-mini-cart-sroll">
-                  {items.length ? (
+                  {loading ? (
+                    <div className="p-4 text-center">
+                      <div className="spinner-border spinner-border-sm" role="status" />
+                    </div>
+                  ) : items.length ? (
                     <div className="tf-mini-cart-items">
                       {items.map((elm, i) => (
                         <div key={i} className="tf-mini-cart-item file-delete">
@@ -53,13 +76,15 @@ export default function Wishlist() {
                                 className="text-button tf-btn-remove remove"
                                 onClick={() => removeFromWishlist(elm.id)}
                               >
-                                Remove
+                                {t("wishlistPage.remove")}
                               </div>
                             </div>
                             <div className="d-flex align-items-center justify-content-between flex-wrap gap-12">
-                              <div className="text-secondary-2">XL/Blue</div>
+                              <div className="text-secondary-2">
+                                {elm.sizes?.[0] || ""}{elm.colors?.[0]?.name ? `/${elm.colors[0].name}` : ""}
+                              </div>
                               <div className="text-button">
-                                ${elm.price.toFixed(2)}
+                                R${elm.price.toFixed(2)}
                               </div>
                             </div>
                           </div>
@@ -68,10 +93,9 @@ export default function Wishlist() {
                     </div>
                   ) : (
                     <div className="p-4">
-                      Your wishlist is empty. Start adding your favorite
-                      products to save them for later!{" "}
+                      {t("wishlistPage.empty")}{" "}
                       <Link className="btn-line" href="/shop-default-grid">
-                        Explore Products
+                        {t("wishlistPage.exploreProducts")}
                       </Link>
                     </div>
                   )}
@@ -82,13 +106,13 @@ export default function Wishlist() {
                   href={`/wish-list`}
                   className="btn-style-2 w-100 radius-4 view-all-wishlist"
                 >
-                  <span className="text-btn-uppercase">View All Wish List</span>
+                  <span className="text-btn-uppercase">{t("wishlistPage.viewAll")}</span>
                 </Link>
                 <Link
                   href={`/shop-default-grid`}
                   className="text-btn-uppercase"
                 >
-                  Or continue shopping
+                  {t("cart.continueShopping")}
                 </Link>
               </div>
             </div>

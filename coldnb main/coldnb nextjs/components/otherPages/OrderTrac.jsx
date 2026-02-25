@@ -1,45 +1,43 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function OrderTrac() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="login-wrap tracking-wrap">
           <div className="left">
             <div className="heading">
-              <h4 className="mb_8">Order Tracking</h4>
+              <h4 className="mb_8">{t("orderTracking.title")}</h4>
               <p>
-                To track your order please enter your Order ID in the box below
-                and press the "Track" button. This was given to you on your
-                receipt and in the confirmation email you should have received.
+                {t("orderTracking.description")}
               </p>
             </div>
             <form onSubmit={(e) => e.preventDefault()} className="form-login">
               <div className="wrap">
                 <fieldset>
-                  <input type="text" placeholder="Username or email address*" />
+                  <input type="text" placeholder={t("orderTracking.orderId")} />
                 </fieldset>
                 <fieldset>
-                  <input type="text" placeholder="Billing Email*" />
+                  <input type="text" placeholder={t("orderTracking.billingEmail")} />
                 </fieldset>
               </div>
               <div className="button-submit">
                 <button className="tf-btn btn-fill" type="submit">
-                  <span className="text">Tracking Orders</span>
+                  <span className="text">{t("orderTracking.trackingOrders")}</span>
                 </button>
               </div>
             </form>
           </div>
           <div className="right">
-            <h4 className="mb_8">Already have an account?</h4>
+            <h4 className="mb_8">{t("orderTracking.alreadyHaveAccount")}</h4>
             <p className="text-secondary">
-              Welcome back. Sign in to access your personalized experience,
-              saved preferences, and more. We're thrilled to have you with us
-              again!
+              {t("orderTracking.welcomeBack")}
             </p>
             <Link href={`/login`} className="tf-btn btn-fill">
-              <span className="text">Login</span>
+              <span className="text">{t("login.login")}</span>
             </Link>
           </div>
         </div>

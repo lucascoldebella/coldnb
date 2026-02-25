@@ -1,15 +1,18 @@
 "use client";
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 
 export default function NewsLetter() {
+  const { t } = useLanguage();
   return (
     <section className="section-newsletter">
       <div className="content">
         <h3 className="heading text-white wow fadeInUp">
-          Sign up and get 20% off your first order
+          {t("homepage.signUpGet20")}
         </h3>
         <p className="text text-white wow fadeInUp" data-wow-delay="0.1s">
-          Sign up for early sale access, new in, promotions and more
+          {t("homepage.signUpPromo")}
         </p>
         <form
           className="form-newsletter subscribe-form wow fadeInUp"
@@ -24,7 +27,7 @@ export default function NewsLetter() {
                 name="email-form"
                 id="subscribe-email"
                 className="subscribe-email"
-                placeholder="Enter your e-mail"
+                placeholder={t("homepage.enterEmail")}
                 tabIndex={0}
                 aria-required="true"
               />
@@ -35,7 +38,7 @@ export default function NewsLetter() {
                 type="button"
                 id="subscribe-button"
               >
-                SUBSCRIBE
+                {t("newsletter.subscribe")}
               </button>
             </div>
           </div>

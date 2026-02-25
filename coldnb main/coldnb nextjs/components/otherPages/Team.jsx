@@ -3,16 +3,17 @@ import Image from "next/image";
 import { teamMembers } from "@/data/team";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Team() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Meet Our Teams</h3>
+          <h3 className="heading">{t("homepage.meetOurTeams")}</h3>
           <p className="subheading text-secondary-2">
-            Discover exceptional experiences through testimonials from our
-            satisfied customers.
+            {t("homepage.teamDesc")}
           </p>
         </div>
         <Swiper

@@ -1,9 +1,12 @@
+"use client";
 import React from "react";
 import Comments from "./Comments";
 import CommentForm from "./CommentForm";
 import Sidebar2 from "./Sidebar2";
 import Image from "next/image";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function BlogDetail2({ blog }) {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing">
       <div className="container">
@@ -15,7 +18,7 @@ export default function BlogDetail2({ blog }) {
                   <ul className="list-tags has-bg">
                     <li>
                       <a href="#" className="link">
-                        Fashion Trends
+                        {t("blog.fashionTrends")}
                       </a>
                     </li>
                   </ul>
@@ -32,9 +35,9 @@ export default function BlogDetail2({ blog }) {
                         <i className="icon-user" />
                       </div>
                       <p className="body-text-1">
-                        by{" "}
+                        {t("blog.by")}{" "}
                         <a className="link" href="#">
-                          Themesflat
+                          Coldnb
                         </a>
                       </p>
                     </div>
@@ -156,20 +159,20 @@ export default function BlogDetail2({ blog }) {
                 </div>
                 <div className="bot d-flex justify-content-between gap-10 flex-wrap">
                   <ul className="list-tags has-bg">
-                    <li>Tag:</li>
+                    <li>{t("blog.tagLabel")}</li>
                     <li>
                       <a href="#" className="link">
-                        Fashion
+                        {t("blog.fashion")}
                       </a>
                     </li>
                     <li>
                       <a href="#" className="link">
-                        Trending
+                        {t("blog.trending")}
                       </a>
                     </li>
                   </ul>
                   <div className="d-flex align-items-center justify-content-between gap-16">
-                    <p>Share this post:</p>
+                    <p>{t("blog.sharePost")}</p>
                     <ul className="tf-social-icon style-1">
                       <li>
                         <a href="#" className="social-facebook">
@@ -197,7 +200,7 @@ export default function BlogDetail2({ blog }) {
                 <div className="related-post">
                   <div className="pre w-50">
                     <div className="text-btn-uppercase">
-                      <a href="#">Previous</a>
+                      <a href="#">{t("blog.previous")}</a>
                     </div>
                     <h6 className="fw-5">
                       <a className="link" href="#">
@@ -207,7 +210,7 @@ export default function BlogDetail2({ blog }) {
                   </div>
                   <div className="next w-50">
                     <div className="text-btn-uppercase text-end">
-                      <a href="#">Next</a>
+                      <a href="#">{t("blog.next")}</a>
                     </div>
                     <h6 className="fw-5 text-end">
                       <a className="link" href="#">

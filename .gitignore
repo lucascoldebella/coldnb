@@ -1,0 +1,62 @@
+# Build artifacts
+build/
+*.o
+*.d
+dist/
+
+# Logs
+logs/
+*.log
+
+# Node modules and dependencies
+node_modules/
+package-lock.json
+.next/
+.env.local
+.env.*.local
+
+# Secrets - NEVER commit these
+config/secrets/
+/etc/coldnb/secrets/
+.env
+.env.*.secret
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.editorconfig
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Compiled binaries
+*.out
+coldnb-server
+generate_admin_password
+
+# Core dumps
+core
+core.*
+
+# Test artifacts
+test-results/
+coverage/
+.coverage
+
+# Uploads (local testing)
+uploads/
+tmp/
+
+# Profiling
+*.gcda
+*.gcno
+*.gcov
+gmon.out
+
+# Compiled test binaries
+tests/*.out

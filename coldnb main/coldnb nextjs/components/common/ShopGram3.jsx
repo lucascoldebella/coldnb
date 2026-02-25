@@ -4,14 +4,16 @@ import React from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function ShopGram3({ parentClass = "" }) {
+  const { t } = useLanguage();
   return (
     <section className={parentClass}>
       <div className="container-full2">
         <div className="heading-section text-center">
-          <h3 className="heading wow fadeInUp">Shop Instagram</h3>
+          <h3 className="heading wow fadeInUp">{t("homepage.shopInstagram")}</h3>
           <p className="subheading text-secondary wow fadeInUp">
-            Elevate your wardrobe with fresh finds today!
+            {t("homepage.instagramDesc")}
           </p>
         </div>
         <Swiper
@@ -45,7 +47,7 @@ export default function ShopGram3({ parentClass = "" }) {
                   className="box-icon hover-tooltip"
                 >
                   <span className="icon icon-eye" />
-                  <span className="tooltip">View Product</span>
+                  <span className="tooltip">{t("homepage.viewProduct")}</span>
                 </Link>
               </div>
             </SwiperSlide>

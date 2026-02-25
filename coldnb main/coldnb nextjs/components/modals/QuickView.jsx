@@ -1,12 +1,15 @@
 "use client";
 import React, { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import SizeSelect from "../productDetails/SizeSelect";
 import ColorSelect from "../productDetails/ColorSelect";
 import Grid5 from "../productDetails/grids/Grid5";
 import { useContextElement } from "@/context/Context";
 import QuantitySelect from "../productDetails/QuantitySelect";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function QuickView() {
+  const { t } = useLanguage();
   const [activeColor, setActiveColor] = useState("gray");
   const [quantity, setQuantity] = useState(1); // Initial quantity is 1
   const {
@@ -20,6 +23,7 @@ export default function QuickView() {
     cartProducts,
     updateQuantity,
   } = useContextElement();
+  const router = useRouter();
 
   const openModalSizeChoice = () => {
     const bootstrap = require("bootstrap"); // dynamically import bootstrap
@@ -51,7 +55,7 @@ export default function QuickView() {
           />
           <div className="wrap mw-100p-hidden">
             <div className="header">
-              <h5 className="title">Quick View</h5>
+              <h5 className="title">{t("product.quickView")}</h5>
               <span
                 className="icon-close icon-close-popup"
                 data-bs-dismiss="modal"
@@ -60,7 +64,7 @@ export default function QuickView() {
             <div className="tf-product-info-list">
               <div className="tf-product-info-heading">
                 <div className="tf-product-info-name">
-                  <div className="text text-btn-uppercase">Clothing</div>
+                  <div className="text text-btn-uppercase">{t("product.clothing")}</div>
                   <h3 className="name">{quickViewItem.title}</h3>
                   <div className="sub">
                     <div className="tf-product-info-rate">
@@ -71,12 +75,12 @@ export default function QuickView() {
                         <i className="icon icon-star" />
                         <i className="icon icon-star" />
                       </div>
-                      <div className="text text-caption-1">(134 reviews)</div>
+                      <div className="text text-caption-1">{"(134 " + t("product.reviews") + ")"}</div>
                     </div>
                     <div className="tf-product-info-sold">
                       <i className="icon icon-lightning" />
                       <div className="text text-caption-1">
-                        18&nbsp;sold in last&nbsp;32&nbsp;hours
+                        {t("product.soldInLastHours").replace("{sold}", "18").replace("{hours}", "32")}
                       </div>
                     </div>
                   </div>
@@ -101,15 +105,12 @@ export default function QuickView() {
                     )}
                   </div>
                   <p>
-                    The garments labelled as Committed are products that have
-                    been produced using sustainable fibres or processes,
-                    reducing their environmental impact.
+                    {t("product.sustainableDesc")}
                   </p>
                   <div className="tf-product-info-liveview">
                     <i className="icon icon-eye" />
                     <p className="text-caption-1">
-                      <span className="liveview-count">28</span> people are
-                      viewing this right now
+                      {t("product.viewingNow").replace("{count}", "28")}
                     </p>
                   </div>
                 </div>
@@ -121,7 +122,7 @@ export default function QuickView() {
                 />
                 <SizeSelect />
                 <div className="tf-product-info-quantity">
-                  <div className="title mb_12">Quantity:</div>
+                  <div className="title mb_12">{t("product.quantity")}</div>
                   <QuantitySelect
                     quantity={
                       isAddedToCartProducts(quickViewItem.id)
@@ -144,13 +145,13 @@ export default function QuickView() {
                     <a
                       className="btn-style-2 flex-grow-1 text-btn-uppercase fw-6 show-shopping-cart"
                       onClick={() =>
-                        addProductToCart(quickViewItem.id, quantity)
+                        addProductToCart(quickViewItem, quantity)
                       }
                     >
                       <span>
                         {isAddedToCartProducts(quickViewItem.id)
-                          ? "Already Added"
-                          : "Add to cart -"}
+                          ? t("product.alreadyAdded")
+                          : t("product.addToCartDash")}
                       </span>
                       <span className="tf-qty-price total-price">
                         $
@@ -175,8 +176,8 @@ export default function QuickView() {
                       <span className="tooltip text-caption-2">
                         {" "}
                         {isAddedtoCompareItem(quickViewItem.id)
-                          ? "Already compared"
-                          : "Compare"}
+                          ? t("product.alreadyCompared")
+                          : t("product.compare")}
                       </span>
                     </a>
                     <a
@@ -186,13 +187,20 @@ export default function QuickView() {
                       <span className="icon icon-heart" />
                       <span className="tooltip text-caption-2">
                         {isAddedtoWishlist(quickViewItem.id)
-                          ? "Already Wishlished"
-                          : "Wishlist"}
+                          ? t("product.alreadyWishlisted")
+                          : t("product.wishlist")}
                       </span>
                     </a>
                   </div>
-                  <a href="#" className="btn-style-3 text-btn-uppercase">
-                    Buy it now
+                  <a
+                    onClick={() => {
+                      addProductToCart(quickViewItem, quantity);
+                      router.push("/checkout");
+                    }}
+                    className="btn-style-3 text-btn-uppercase"
+                    style={{ cursor: "pointer" }}
+                  >
+                    {t("product.buyItNow")}
                   </a>
                 </div>
               </div>

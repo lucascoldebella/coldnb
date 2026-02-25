@@ -1,16 +1,18 @@
 import React from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function ReturnPolicies() {
+  const { t } = useLanguage();
   return (
     <>
       {" "}
-      <div className="text-btn-uppercase mb_12">Return Policies</div>
+      <div className="text-btn-uppercase mb_12">{t("productDescription.returnPoliciesTitle")}</div>
       <p className="mb_12 text-secondary">
         At ColdnbMain, we stand behind the quality of our products. If you're not
         completely satisfied with your purchase, we offer hassle-free returns
         within 30 days of delivery.
       </p>
-      <div className="text-btn-uppercase mb_12">Easy Exchanges or Refunds</div>
+      <div className="text-btn-uppercase mb_12">{t("productDescription.easyExchanges")}</div>
       <ul className="list-text type-disc mb_12 gap-6">
         <li className="text-secondary font-2">
           Exchange your item for a different size, color, or style, or receive a
@@ -21,7 +23,7 @@ export default function ReturnPolicies() {
           with tags attached.
         </li>
       </ul>
-      <div className="text-btn-uppercase mb_12">Simple Process</div>
+      <div className="text-btn-uppercase mb_12">{t("productDescription.simpleProcess")}</div>
       <ul className="list-text type-number">
         <li className="text-secondary font-2">
           Initiate your return online or contact our customer service team for

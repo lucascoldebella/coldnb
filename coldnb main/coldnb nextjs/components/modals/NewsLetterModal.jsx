@@ -2,8 +2,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import axios from "axios";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function NewsLetterModal() {
+  const { t } = useLanguage();
   const pathname = usePathname();
   const modalElement = useRef();
   useEffect(() => {
@@ -71,14 +72,15 @@ export default function NewsLetterModal() {
             <span
               className="icon icon-close btn-hide-popup"
               data-bs-dismiss="modal"
+              style={{ zIndex: 2 }}
             />
           </div>
           <div className="modal-bottom text-center">
             <p className="text-btn-uppercase fw-4 font-2">
-              Subscribe To Our Newletter!
+              {t("newsletter.title")}
             </p>
             <h5>
-              Receive 10% OFF your next order, exclusive offers &amp; more!
+              {t("newsletter.subtitle")}
             </h5>
             <div
               className={`tfSubscribeMsg  footer-sub-element ${
@@ -87,10 +89,10 @@ export default function NewsLetterModal() {
             >
               {success ? (
                 <p style={{ color: "rgb(52, 168, 83)" }}>
-                  You have successfully subscribed.
+                  {t("newsletter.success")}
                 </p>
               ) : (
-                <p style={{ color: "red" }}>Something went wrong</p>
+                <p style={{ color: "red" }}>{t("newsletter.error")}</p>
               )}
             </div>
             <form
@@ -106,7 +108,7 @@ export default function NewsLetterModal() {
                   type="email"
                   name="email"
                   id="subscribe-email"
-                  placeholder="Enter your e-mail"
+                  placeholder={t("newsletter.emailPlaceholder")}
                   required
                 />
                 <button
@@ -114,7 +116,7 @@ export default function NewsLetterModal() {
                   id="subscribe-button"
                   className="btn-style-2 radius-12 w-100 justify-content-center"
                 >
-                  <span className="text text-btn-uppercase">SUBSCRIBE</span>
+                  <span className="text text-btn-uppercase">{t("newsletter.subscribe")}</span>
                 </button>
               </div>
               <div id="subscribe-msg" />

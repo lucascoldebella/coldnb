@@ -1,0 +1,246 @@
+================================================================================
+                    COLDNB ADMIN PRODUCT MANAGEMENT GUIDE
+================================================================================
+
+Last Updated: 2026-02-03
+Backend: C/libmicrohttpd REST API
+Database: PostgreSQL
+
+================================================================================
+1. ADMIN ACCOUNT CREDENTIALS (DEVELOPMENT)
+================================================================================
+
+Username: admin
+Password: coldnbadmin2024
+Email:    admin@coldnb.com
+Role:     super_admin
+
+To reset password:
+  cd /home/lucas/coldnb/coldnb-backend/scripts
+  ./generate_admin_password "newpassword"
+  # Then run the generated SQL UPDATE statement
+
+================================================================================
+2. API ENDPOINTS OVERVIEW
+================================================================================
+
+Base URL: http://localhost:8080
+
+Authentication Required (Admin JWT):
+  POST   /api/admin/login                    - Get JWT token
+  POST   /api/admin/logout                   - Invalidate token
+  GET    /api/admin/products                 - List all products
+  GET    /api/admin/products/:id             - Get product details
+  POST   /api/admin/products                 - Create new product
+  PUT    /api/admin/products/:id             - Update product
+  DELETE /api/admin/products/:id             - Soft delete product
+  POST   /api/admin/products/:id/images      - Add product image
+  DELETE /api/admin/products/:id/images/:img - Remove product image
+
+Public (No Auth):
+  GET    /api/products                       - List active products
+  GET    /api/products/:id                   - Get product (by id or slug)
+  GET    /api/categories                     - List categories
+
+================================================================================
+3. AUTHENTICATION FLOW
+================================================================================
+
+Step 1: Login to get JWT token
+---------------------------------
+curl -X POST http://localhost:8080/api/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "coldnbadmin2024"}'
+
+Response:
+{
+  "success": true,
+  "data": {
+    "token": "eyJhbGc...",
+    "expires_at": 1707123456,
+    "user": { "id": "...", "username": "admin", "role": "super_admin" }
+  }
+}
+
+Step 2: Use token in subsequent requests
+-----------------------------------------
+Authorization: Bearer <token>
+
+Token expires after 24 hours (configurable in server.conf).
+
+================================================================================
+4. PRODUCT DATA STRUCTURE
+================================================================================
+
+Required Fields:
+  name              VARCHAR(255)    Product display name
+
+Optional Fields:
+  slug              VARCHAR(255)    URL identifier (auto-generated from name)
+  description       TEXT            Full product description
+  short_description VARCHAR(500)    Brief description for cards
+  sku               VARCHAR(100)    Stock keeping unit (must be unique)
+  price             DECIMAL(10,2)   Product price (default 0)
+  compare_at_price  DECIMAL(10,2)   Original price for sales
+  cost_price        DECIMAL(10,2)   Internal cost tracking
+  category_id       INTEGER         FK to categories table
+  brand             VARCHAR(255)    Brand name
+  stock_quantity    INTEGER         Inventory count (default 0)
+  is_active         BOOLEAN         Show on website (default true)
+  is_featured       BOOLEAN         Show on homepage (default false)
+  is_new            BOOLEAN         "New" badge (default false)
+  is_sale           BOOLEAN         "Sale" badge (default false)
+  meta_title        VARCHAR(255)    SEO title
+  meta_description  VARCHAR(500)    SEO description
+
+================================================================================
+5. AVAILABLE CATEGORIES
+================================================================================
+
+  ID | Name        | Slug
+  ---|-------------|-------------
+  1  | Clothing    | clothing
+  2  | Accessories | accessories
+  3  | Footwear    | footwear
+
+================================================================================
+6. CREATE PRODUCT EXAMPLE
+================================================================================
+
+curl -X POST http://localhost:8080/api/admin/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "name": "Gold Necklace",
+    "description": "Beautiful 18k gold necklace with diamond pendant",
+    "short_description": "18k gold necklace",
+    "sku": "NECK-001",
+    "price": 299.99,
+    "compare_at_price": 399.99,
+    "category_id": 2,
+    "brand": "Coldnb",
+    "stock_quantity": 50,
+    "is_active": true,
+    "is_featured": true,
+    "is_new": true
+  }'
+
+================================================================================
+7. ADD PRODUCT IMAGE
+================================================================================
+
+Images are stored as URLs (external hosting or local path).
+
+curl -X POST http://localhost:8080/api/admin/products/1/images \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "url": "/images/products/necklace-001.jpg",
+    "alt_text": "Gold necklace front view",
+    "is_primary": true,
+    "sort_order": 0
+  }'
+
+Image Fields:
+  url         VARCHAR(500)    Image path or URL (required)
+  alt_text    VARCHAR(255)    Accessibility text
+  is_primary  BOOLEAN         Main product image (default false)
+  sort_order  INTEGER         Display order (default 0)
+
+================================================================================
+8. UPDATE PRODUCT
+================================================================================
+
+Only provided fields are updated:
+
+curl -X PUT http://localhost:8080/api/admin/products/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "price": 249.99,
+    "stock_quantity": 45,
+    "is_sale": true
+  }'
+
+================================================================================
+9. DELETE PRODUCT (SOFT DELETE)
+================================================================================
+
+Products are not removed from database, only marked inactive:
+
+curl -X DELETE http://localhost:8080/api/admin/products/1 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+To permanently delete, use SQL:
+  DELETE FROM products WHERE id = 1;
+
+================================================================================
+10. SHELL SCRIPTS
+================================================================================
+
+Location: /home/lucas/coldnb/coldnb-backend/scripts/
+
+  coldnb-admin           - Interactive product management CLI
+  coldnb-admin login     - Get and cache JWT token
+  coldnb-admin list      - List all products
+  coldnb-admin create    - Create new product (interactive)
+  coldnb-admin update    - Update product
+  coldnb-admin delete    - Soft delete product
+  coldnb-admin image     - Add image to product
+  coldnb-admin categories- List available categories
+
+================================================================================
+11. DATABASE DIRECT ACCESS
+================================================================================
+
+Connection (development):
+  Host:     localhost
+  Port:     5432
+  Database: coldnb
+  User:     coldnb
+  Password: (see config/secrets/db_password)
+
+Quick commands:
+  # List products
+  psql -h localhost -U coldnb -d coldnb \
+    -c "SELECT id, name, price, stock_quantity FROM products;"
+
+  # Insert product directly
+  psql -h localhost -U coldnb -d coldnb -c "
+    INSERT INTO products (name, slug, price, category_id, is_active)
+    VALUES ('Product Name', 'product-slug', 99.99, 1, true);"
+
+================================================================================
+12. PRODUCT FLOW: DATABASE -> WEBSITE
+================================================================================
+
+1. Admin creates product via API or SQL
+2. Product stored in PostgreSQL with is_active = true
+3. Frontend (localhost:3000) calls GET /api/products
+4. Backend returns only active products
+5. Frontend renders product grid
+6. User clicks product -> GET /api/products/:slug
+7. Product detail page displayed
+
+================================================================================
+13. TROUBLESHOOTING
+================================================================================
+
+API returns 401 Unauthorized:
+  - Token expired (24h lifetime)
+  - Run: coldnb-admin login
+
+API returns 403 Forbidden:
+  - User is not admin
+  - Check admin_users table
+
+API returns 409 Conflict:
+  - Duplicate slug or SKU
+  - Use unique values
+
+Product not showing on website:
+  - Check is_active = true
+  - Verify backend is running (port 8080)
+  - Check frontend API calls in browser console
+
+================================================================================

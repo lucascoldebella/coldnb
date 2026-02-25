@@ -1,9 +1,11 @@
 "use client";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function CommentForm() {
+  const { t } = useLanguage();
   return (
     <div className="leave-comment">
-      <h4 className="leave-comment-heading">Leave A Comment</h4>
+      <h4 className="leave-comment-heading">{t("blog.leaveComment")}</h4>
       <form className="form-leave-comment" onSubmit={(e) => e.preventDefault()}>
         <div className="wrap">
           <div className="cols">
@@ -11,7 +13,7 @@ export default function CommentForm() {
               <input
                 className=""
                 type="text"
-                placeholder="Your Name*"
+                placeholder={t("contact.yourName")}
                 name="text"
                 tabIndex={2}
                 defaultValue=""
@@ -23,7 +25,7 @@ export default function CommentForm() {
               <input
                 className=""
                 type="email"
-                placeholder="Your Email*"
+                placeholder={t("contact.yourEmail")}
                 name="email"
                 tabIndex={2}
                 defaultValue=""
@@ -36,7 +38,7 @@ export default function CommentForm() {
             <textarea
               className=""
               rows={4}
-              placeholder="Your Message*"
+              placeholder={t("contact.yourMessage")}
               tabIndex={2}
               aria-required="true"
               required
@@ -46,7 +48,7 @@ export default function CommentForm() {
         </div>
         <div className="button-submit">
           <button className="" type="submit">
-            Submit Review
+            {t("blog.submitReview")}
           </button>
         </div>
       </form>

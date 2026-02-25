@@ -1,10 +1,21 @@
 "use client";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, EffectFade, Pagination } from "swiper/modules";
-import { slides } from "@/data/heroSlides";
+import { slides as staticSlides } from "@/data/heroSlides";
 import Image from "next/image";
 import Link from "next/link";
-export default function Hero() {
+export default function Hero({ data }) {
+  const slides = data && data.length > 0
+    ? data.map((s) => ({
+        imgSrc: s.image_url,
+        alt: s.image_alt || "fashion-slideshow",
+        subheading: s.subtitle || "",
+        heading: s.title || "",
+        btnText: s.button_text || "Explore Collection",
+        btnLink: s.button_link || "/shop-default-grid",
+      }))
+    : staticSlides;
+
   return (
     <section className="tf-slideshow slider-default slider-effect-fade">
       <Swiper
@@ -49,7 +60,7 @@ export default function Hero() {
                   </div>
                   <div className="fade-item fade-item-3 box-btn-slider">
                     <Link
-                      href={`/shop-default-grid`}
+                      href={slide.btnLink || `/shop-default-grid`}
                       className="tf-btn btn-fill btn-white"
                     >
                       <span className="text">{slide.btnText}</span>

@@ -37,9 +37,28 @@ void handler_user_profile_get(HttpRequest *req, HttpResponse *resp, void *user_d
 
     if (!db_result_ok(result) || !db_result_has_rows(result)) {
         PQclear(result);
-        db_pool_release(pool, conn);
-        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "User not found");
-        return;
+
+        /* Auto-create user profile if not found */
+        AuthContext *auth = auth_get_context(req);
+        const char *email = (auth != NULL) ? auth->email : NULL;
+
+        const char *upsert_query =
+            "INSERT INTO users (supabase_id, email, email_verified) "
+            "VALUES ($1, $2, false) "
+            "ON CONFLICT (supabase_id) DO UPDATE SET email = EXCLUDED.email "
+            "RETURNING id, email, full_name, phone, avatar_url, email_verified, created_at";
+        const char *upsert_params[] = { user_id, email };
+
+        result = db_exec_params(conn, upsert_query, 2, upsert_params);
+
+        if (!db_result_ok(result) || !db_result_has_rows(result)) {
+            PQclear(result);
+            db_pool_release(pool, conn);
+            http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to create user profile");
+            return;
+        }
+
+        LOG_INFO("Auto-created profile for user: %s", user_id);
     }
 
     DbRow row = { .result = result, .row = 0 };

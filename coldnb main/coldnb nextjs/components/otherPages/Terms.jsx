@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 const sectionIds = [
   "terms",
@@ -9,24 +10,28 @@ const sectionIds = [
   "site-terms",
   "risks",
 ];
-const sections = [
-  { id: 1, text: "Terms", scroll: "terms" },
-  { id: 2, text: "Limitations", scroll: "limitations" },
-  {
-    id: 3,
-    text: "Revisions and errata",
-    scroll: "revisions-and-errata",
-  },
-  {
-    id: 4,
-    text: "Site terms of use modifications",
-    scroll: "site-terms",
-  },
-  { id: 5, text: "Risks", scroll: "risks" },
-];
+
+// Dynamic sections object will be created inside component to access t()
 
 export default function Terms() {
+  const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState(sectionIds[0]);
+
+  const sections = [
+    { id: 1, text: t("terms.terms"), scroll: "terms" },
+    { id: 2, text: t("terms.limitations"), scroll: "limitations" },
+    {
+      id: 3,
+      text: t("terms.revisions"),
+      scroll: "revisions-and-errata",
+    },
+    {
+      id: 4,
+      text: t("terms.siteTerms"),
+      scroll: "site-terms",
+    },
+    { id: 5, text: t("terms.risks"), scroll: "risks" },
+  ];
 
   useEffect(() => {
     // Create an IntersectionObserver to track visibility of sections
@@ -82,9 +87,9 @@ export default function Terms() {
             ))}
           </div>
           <div className="right">
-            <h4 className="heading">Terms of use</h4>
+            <h4 className="heading">{t("terms.termsOfUse")}</h4>
             <div className="terms-of-use-item item-scroll-target" id="terms">
-              <h5 className="terms-of-use-title">1. Terms</h5>
+              <h5 className="terms-of-use-title">1. {t("terms.terms")}</h5>
               <div className="terms-of-use-content">
                 <p>
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -114,7 +119,7 @@ export default function Terms() {
               className="terms-of-use-item item-scroll-target"
               id="limitations"
             >
-              <h5 className="terms-of-use-title">2. Limitations</h5>
+              <h5 className="terms-of-use-title">2. {t("terms.limitations")}</h5>
               <div className="terms-of-use-content">
                 <p>
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -144,7 +149,7 @@ export default function Terms() {
               className="terms-of-use-item item-scroll-target"
               id="revisions-and-errata"
             >
-              <h5 className="terms-of-use-title">3. Revisions and errata</h5>
+              <h5 className="terms-of-use-title">3. {t("terms.revisions")}</h5>
               <div className="terms-of-use-content">
                 <p>
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit.
@@ -175,7 +180,7 @@ export default function Terms() {
               id="site-terms"
             >
               <h5 className="terms-of-use-title">
-                4. Site terms of use modifications
+                4. {t("terms.siteTerms")}
               </h5>
               <div className="terms-of-use-content">
                 <p>
@@ -203,7 +208,7 @@ export default function Terms() {
               </div>
             </div>
             <div className="terms-of-use-item item-scroll-target" id="risks">
-              <h5 className="terms-of-use-title">5. Risks</h5>
+              <h5 className="terms-of-use-title">5. {t("terms.risks")}</h5>
               <div className="terms-of-use-content">
                 <p>
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit.

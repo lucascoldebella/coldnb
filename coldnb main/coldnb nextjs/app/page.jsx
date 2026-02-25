@@ -16,16 +16,32 @@ export const metadata = {
   description: "ColdnbMain - eCommerce",
 };
 
-export default function HomePage() {
+async function getHomepageData() {
+  try {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+    const res = await fetch(`${apiUrl}/api/homepage`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function HomePage() {
+  const data = await getHomepageData();
+
   return (
     <>
       <Topbar />
       <Header1 />
-      <Hero />
-      <Collections />
-      <Products />
-      <BannerCollection />
-      <BannerCountdown />
+      <Hero data={data?.hero_slides} />
+      <Collections data={data?.categories} />
+      <Products data={data?.sections?.products_tabbed} />
+      <BannerCollection data={data?.banners_collection} />
+      <BannerCountdown data={data?.banner_countdown} />
       <Testimonials />
       <Blogs />
       <ShopGram />

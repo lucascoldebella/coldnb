@@ -4,15 +4,16 @@ import React from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Testimonials3() {
+  const { t } = useLanguage();
   return (
     <section className="flat-spacing bg-surface">
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">Customer Say!</h3>
+          <h3 className="heading">{t("homepage.customerSay")}</h3>
           <p className="subheading">
-            Our customers adore our products, and we constantly aim to delight
-            them.
+            {t("homepage.customerDesc")}
           </p>
         </div>
         <Swiper

@@ -1,0 +1,266 @@
+#!/bin/bash
+#
+# coldnb-db - Direct database operations for Coldnb
+#
+# Fast database access for bulk operations, bypassing the API.
+# Use for: imports, exports, maintenance, debugging.
+#
+
+set -e
+
+# Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="$(dirname "$SCRIPT_DIR")/config"
+DB_HOST="${COLDNB_DB_HOST:-localhost}"
+DB_PORT="${COLDNB_DB_PORT:-5432}"
+DB_NAME="${COLDNB_DB_NAME:-coldnb}"
+DB_USER="${COLDNB_DB_USER:-coldnb}"
+DB_PASS_FILE="$CONFIG_DIR/secrets/db_password"
+
+# Get password
+get_db_pass() {
+    if [ -n "$COLDNB_DB_PASS" ]; then
+        echo "$COLDNB_DB_PASS"
+    elif [ -f "$DB_PASS_FILE" ]; then
+        cat "$DB_PASS_FILE"
+    else
+        echo "Error: Database password not found" >&2
+        exit 1
+    fi
+}
+
+# Run SQL
+run_sql() {
+    PGPASSWORD=$(get_db_pass) psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" "$@"
+}
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+ok() { echo -e "${GREEN}$*${NC}"; }
+err() { echo -e "${RED}Error:${NC} $*" >&2; }
+info() { echo -e "${YELLOW}$*${NC}"; }
+
+cmd_shell() {
+    # Interactive psql shell
+    run_sql
+}
+
+cmd_query() {
+    # Run single query
+    local query="$1"
+    if [ -z "$query" ]; then
+        err "Usage: coldnb-db query 'SELECT ...'"
+        exit 1
+    fi
+    run_sql -c "$query"
+}
+
+cmd_list_products() {
+    run_sql -c "
+        SELECT p.id, p.name, p.slug, p.price, p.stock_quantity,
+               CASE WHEN p.is_active THEN 'Yes' ELSE 'No' END as active,
+               c.name as category
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        ORDER BY p.created_at DESC;
+    "
+}
+
+cmd_list_categories() {
+    run_sql -c "SELECT id, name, slug, description FROM categories ORDER BY sort_order;"
+}
+
+cmd_add_product() {
+    # Quick add product via SQL
+    local name="$1"
+    local price="$2"
+    local stock="${3:-10}"
+    local category="${4:-}"
+
+    if [ -z "$name" ] || [ -z "$price" ]; then
+        err "Usage: coldnb-db add-product <name> <price> [stock] [category_id]"
+        exit 1
+    fi
+
+    # Generate slug
+    local slug
+    slug=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-')
+
+    local sql
+    if [ -n "$category" ]; then
+        sql="INSERT INTO products (name, slug, price, stock_quantity, category_id, is_active)
+             VALUES ('$name', '$slug', $price, $stock, $category, true)
+             RETURNING id, name, slug;"
+    else
+        sql="INSERT INTO products (name, slug, price, stock_quantity, is_active)
+             VALUES ('$name', '$slug', $price, $stock, true)
+             RETURNING id, name, slug;"
+    fi
+
+    run_sql -c "$sql"
+    ok "Product created!"
+}
+
+cmd_add_image() {
+    local product_id="$1"
+    local url="$2"
+    local is_primary="${3:-false}"
+
+    if [ -z "$product_id" ] || [ -z "$url" ]; then
+        err "Usage: coldnb-db add-image <product_id> <url> [is_primary:true/false]"
+        exit 1
+    fi
+
+    run_sql -c "
+        INSERT INTO product_images (product_id, url, is_primary)
+        VALUES ($product_id, '$url', $is_primary)
+        RETURNING id, product_id, url, is_primary;
+    "
+    ok "Image added!"
+}
+
+cmd_import_csv() {
+    # Import products from CSV
+    local csv_file="$1"
+
+    if [ -z "$csv_file" ] || [ ! -f "$csv_file" ]; then
+        err "Usage: coldnb-db import-csv <file.csv>"
+        echo "CSV format: name,price,stock,category_id,description"
+        exit 1
+    fi
+
+    info "Importing from $csv_file..."
+
+    # Skip header, process each line
+    local count=0
+    while IFS=, read -r name price stock category_id description; do
+        # Skip header
+        [ "$name" = "name" ] && continue
+
+        local slug
+        slug=$(echo "$name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-')
+
+        run_sql -c "
+            INSERT INTO products (name, slug, price, stock_quantity, category_id, description, is_active)
+            VALUES ('$name', '$slug', $price, ${stock:-0}, ${category_id:-NULL}, '${description:-}', true)
+            ON CONFLICT (slug) DO UPDATE SET
+                price = EXCLUDED.price,
+                stock_quantity = EXCLUDED.stock_quantity;
+        " >/dev/null 2>&1 && ((count++))
+    done < "$csv_file"
+
+    ok "Imported $count products"
+}
+
+cmd_export_csv() {
+    # Export products to CSV
+    local output="${1:-products_export.csv}"
+
+    run_sql -c "COPY (
+        SELECT p.id, p.name, p.slug, p.sku, p.price, p.compare_at_price,
+               p.stock_quantity, p.category_id, c.name as category_name,
+               p.brand, p.is_active, p.is_featured, p.is_new, p.is_sale,
+               p.description, p.short_description
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        ORDER BY p.id
+    ) TO STDOUT WITH CSV HEADER;" > "$output"
+
+    ok "Exported to $output"
+}
+
+cmd_stats() {
+    echo "=== Database Statistics ==="
+    echo
+    run_sql -c "
+        SELECT
+            (SELECT COUNT(*) FROM products) as total_products,
+            (SELECT COUNT(*) FROM products WHERE is_active) as active_products,
+            (SELECT COUNT(*) FROM products WHERE is_featured) as featured_products,
+            (SELECT COUNT(*) FROM categories) as categories,
+            (SELECT COUNT(*) FROM product_images) as product_images,
+            (SELECT COUNT(*) FROM admin_users WHERE is_active) as admin_users;
+    "
+}
+
+cmd_reset_products() {
+    warn "This will DELETE ALL products from the database!"
+    read -rp "Type 'DELETE' to confirm: " confirm
+
+    if [ "$confirm" != "DELETE" ]; then
+        info "Cancelled"
+        exit 0
+    fi
+
+    run_sql -c "TRUNCATE products, product_images, product_colors, product_sizes RESTART IDENTITY CASCADE;"
+    ok "All products deleted"
+}
+
+cmd_help() {
+    cat << 'EOF'
+coldnb-db - Direct database operations for Coldnb
+
+USAGE:
+    coldnb-db <command> [options]
+
+COMMANDS:
+    shell               Open interactive psql shell
+    query <sql>         Run single SQL query
+    list-products       List all products
+    list-categories     List all categories
+    add-product <name> <price> [stock] [category_id]
+                        Quick add product via SQL
+    add-image <product_id> <url> [is_primary]
+                        Add image to product
+    import-csv <file>   Import products from CSV
+    export-csv [file]   Export products to CSV
+    stats               Show database statistics
+    reset-products      Delete all products (dangerous!)
+    help                Show this help
+
+ENVIRONMENT:
+    COLDNB_DB_HOST      Database host (default: localhost)
+    COLDNB_DB_PORT      Database port (default: 5432)
+    COLDNB_DB_NAME      Database name (default: coldnb)
+    COLDNB_DB_USER      Database user (default: coldnb)
+    COLDNB_DB_PASS      Database password (overrides file)
+
+EXAMPLES:
+    coldnb-db shell
+    coldnb-db list-products
+    coldnb-db add-product "Silver Bracelet" 89.99 30 2
+    coldnb-db add-image 1 "/images/products/bracelet.jpg" true
+    coldnb-db import-csv products.csv
+    coldnb-db export-csv backup.csv
+EOF
+}
+
+# Main
+main() {
+    local cmd="${1:-help}"
+    shift 2>/dev/null || true
+
+    case "$cmd" in
+        shell|psql)         cmd_shell "$@" ;;
+        query|q)            cmd_query "$@" ;;
+        list-products|lp)   cmd_list_products "$@" ;;
+        list-categories|lc) cmd_list_categories "$@" ;;
+        add-product|ap)     cmd_add_product "$@" ;;
+        add-image|ai)       cmd_add_image "$@" ;;
+        import-csv|import)  cmd_import_csv "$@" ;;
+        export-csv|export)  cmd_export_csv "$@" ;;
+        stats)              cmd_stats "$@" ;;
+        reset-products)     cmd_reset_products "$@" ;;
+        help|-h|--help)     cmd_help ;;
+        *)
+            err "Unknown command: $cmd"
+            echo "Run 'coldnb-db help' for usage"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

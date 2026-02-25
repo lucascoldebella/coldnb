@@ -2,7 +2,10 @@
 import React from "react";
 import Image from "next/image";
 import ReviewSorting from "./ReviewSorting";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+
 export default function Reviews() {
+  const { t } = useLanguage();
   return (
     <>
       <div className="tab-reviews-heading">
@@ -17,7 +20,7 @@ export default function Reviews() {
               <i className="icon icon-star" />
               <i className="icon icon-star" />
             </div>
-            <p>(168 Ratings)</p>
+            <p>{"(168 " + t("reviews.ratings") + ")"}</p>
           </div>
           <div className="rating-score">
             <div className="item">
@@ -64,18 +67,18 @@ export default function Reviews() {
         </div>
         <div>
           <div className="btn-style-4 text-btn-uppercase letter-1 btn-comment-review btn-cancel-review">
-            Cancel Review
+            {t("reviews.cancelReview")}
           </div>
           <div className="btn-style-4 text-btn-uppercase letter-1 btn-comment-review btn-write-review">
-            Write a review
+            {t("reviews.writeReview")}
           </div>
         </div>
       </div>
       <div className="reply-comment style-1 cancel-review-wrap">
         <div className="d-flex mb_24 gap-20 align-items-center justify-content-between flex-wrap">
-          <h4 className="">03 Comments</h4>
+          <h4 className="">{"03 " + t("blog.comments")}</h4>
           <div className="d-flex align-items-center gap-12">
-            <div className="text-caption-1">Sort by:</div>
+            <div className="text-caption-1">{t("reviews.sortBy")}</div>
             <ReviewSorting />
           </div>
         </div>
@@ -122,7 +125,7 @@ export default function Reviews() {
               <div>
                 <h6>
                   <a href="#" className="link">
-                    Reply from ColdnbMain
+                    {t("reviews.replyFromColdnb")}
                   </a>
                 </h6>
                 <div className="day text-secondary-2 text-caption-1">
@@ -173,7 +176,7 @@ export default function Reviews() {
         onSubmit={(e) => e.preventDefault()}
       >
         <div className="heading">
-          <h4>Write a review:</h4>
+          <h4>{t("reviews.writeReview")}:</h4>
           <div className="list-rating-check">
             <input type="radio" id="star5" name="rate" defaultValue={5} />
             <label htmlFor="star5" title="text" />
@@ -188,12 +191,12 @@ export default function Reviews() {
           </div>
         </div>
         <div className="mb_32">
-          <div className="mb_8">Review Title</div>
+          <div className="mb_8">{t("reviews.reviewTitle")}</div>
           <fieldset className="mb_20">
             <input
               className=""
               type="text"
-              placeholder="Give your review a title"
+              placeholder={t("reviews.giveTitlePlaceholder")}
               name="text"
               tabIndex={2}
               defaultValue=""
@@ -201,12 +204,12 @@ export default function Reviews() {
               required
             />
           </fieldset>
-          <div className="mb_8">Review</div>
+          <div className="mb_8">{t("reviews.review")}</div>
           <fieldset className="d-flex mb_20">
             <textarea
               className=""
               rows={4}
-              placeholder="Write your comment here"
+              placeholder={t("reviews.writePlaceholder")}
               tabIndex={2}
               aria-required="true"
               required
@@ -218,7 +221,7 @@ export default function Reviews() {
               <input
                 className=""
                 type="text"
-                placeholder="You Name (Public)"
+                placeholder={t("reviews.yourNamePublic")}
                 name="text"
                 tabIndex={2}
                 defaultValue=""
@@ -230,7 +233,7 @@ export default function Reviews() {
               <input
                 className=""
                 type="email"
-                placeholder="Your email (private)"
+                placeholder={t("reviews.yourEmailPrivate")}
                 name="email"
                 tabIndex={2}
                 defaultValue=""
@@ -247,14 +250,13 @@ export default function Reviews() {
               id="check1"
             />
             <label className="text-secondary text-caption-1" htmlFor="check1">
-              Save my name, email, and website in this browser for the next time
-              I comment.
+              {t("reviews.saveInfo")}
             </label>
           </div>
         </div>
         <div className="button-submit">
           <button className="text-btn-uppercase" type="submit">
-            Submit Reviews
+            {t("reviews.submitReviews")}
           </button>
         </div>
       </form>

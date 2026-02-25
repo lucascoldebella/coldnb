@@ -1,11 +1,17 @@
 import React from "react";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { useUserAuth } from "@/context/UserAuthContext";
+
 export default function AccountSidebar() {
+  const { t } = useLanguage();
+  const { profile, signOut, isAuthenticated } = useUserAuth();
+
   return (
     <div className="offcanvas offcanvas-start canvas-sidebar" id="mbAccount">
       <div className="canvas-wrapper">
         <header className="canvas-header">
-          <span className="text-btn-uppercase">SIDEBAR ACCOUNT</span>
+          <span className="text-btn-uppercase">{t("account.sidebarAccount")}</span>
           <span
             className="icon-close icon-close-popup"
             data-bs-dismiss="offcanvas"
@@ -16,14 +22,17 @@ export default function AccountSidebar() {
           <div className="sidebar-account">
             <div className="account-avatar">
               <div className="image">
-                <img src="/images/avatar/user-account.jpg" alt="" />
+                <img
+                  src={profile?.avatar_url || "/images/avatar/user-account.jpg"}
+                  alt=""
+                />
               </div>
-              <h6 className="mb_4">Tony Nguyen</h6>
-              <div className="body-text-1">themesflat@gmail.com</div>
+              <h6 className="mb_4">{profile?.full_name || t("account.myAccount")}</h6>
+              <div className="body-text-1">{profile?.email || ""}</div>
             </div>
             <ul className="my-account-nav">
               <li>
-                <span className="my-account-nav-item active">
+                <Link href="/my-account" className="my-account-nav-item active">
                   <svg
                     width={24}
                     height={24}
@@ -46,8 +55,8 @@ export default function AccountSidebar() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Account Details
-                </span>
+                  {t("account.accountDetails")}
+                </Link>
               </li>
               <li>
                 <Link
@@ -69,7 +78,7 @@ export default function AccountSidebar() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  Your Orders
+                  {t("account.yourOrders")}
                 </Link>
               </li>
               <li>
@@ -99,42 +108,81 @@ export default function AccountSidebar() {
                       strokeLinejoin="round"
                     />
                   </svg>
-                  My Address
+                  {t("account.myAddress")}
                 </Link>
               </li>
               <li>
-                <Link href={`/login`} className="my-account-nav-item">
-                  <svg
-                    width={24}
-                    height={24}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
+                {isAuthenticated ? (
+                  <button
+                    onClick={signOut}
+                    className="my-account-nav-item"
+                    style={{ background: "none", border: "none", width: "100%", textAlign: "left", cursor: "pointer" }}
                   >
-                    <path
-                      d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9"
-                      stroke="#181818"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M16 17L21 12L16 7"
-                      stroke="#181818"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M21 12H9"
-                      stroke="#181818"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Logout
-                </Link>
+                    <svg
+                      width={24}
+                      height={24}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M16 17L21 12L16 7"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M21 12H9"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {t("account.logout")}
+                  </button>
+                ) : (
+                  <Link href="/login" className="my-account-nav-item">
+                    <svg
+                      width={24}
+                      height={24}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M16 17L21 12L16 7"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M21 12H9"
+                        stroke="#181818"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {t("header.login")}
+                  </Link>
+                )}
               </li>
             </ul>
           </div>

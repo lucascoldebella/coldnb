@@ -3,7 +3,9 @@ import Link from "next/link";
 import React from "react";
 import Image from "next/image";
 import { blogPosts6 } from "@/data/blogs";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Sidebar() {
+  const { t } = useLanguage();
   return (
     <div className="sidebar maxw-360">
       <div className="sidebar-item sidebar-search">
@@ -48,7 +50,7 @@ export default function Sidebar() {
         </form>
       </div>
       <div className="sidebar-item sidebar-relatest-post">
-        <h5 className="sidebar-heading">Relatest Post</h5>
+        <h5 className="sidebar-heading">{t("blog.latestPost")}</h5>
         <div>
           {blogPosts6.slice(3, 8).map((post, i) => (
             <div
@@ -97,76 +99,76 @@ export default function Sidebar() {
         </div>
       </div>
       <div className="sidebar-item sidebar-categories">
-        <h5 className="sidebar-heading">Categories</h5>
+        <h5 className="sidebar-heading">{t("blog.categories")}</h5>
         <ul>
           <li>
             <a className="text-button link" href="#">
-              Trending
+              {t("blog.trending")}
             </a>
           </li>
           <li>
             <a className="text-button link" href="#">
-              Fashion
+              {t("blog.fashion")}
             </a>
           </li>
           <li>
             <a className="text-button link" href="#">
-              Outfit
+              {t("blog.outfit")}
             </a>
           </li>
           <li>
             <a className="text-button link" href="#">
-              Accessories
+              {t("blog.accessories")}
             </a>
           </li>
           <li>
             <a className="text-button link" href="#">
-              Beauty
+              {t("blog.beauty")}
             </a>
           </li>
         </ul>
       </div>
       <div className="sidebar-item sidebar-tag">
-        <h5 className="sidebar-heading">Popular Tag</h5>
+        <h5 className="sidebar-heading">{t("blog.popularTag")}</h5>
         <ul className="list-tags">
           <li>
             <a href="#" className="text-caption-1 link">
-              Fashion Trends
+              {t("blog.fashionTrends")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Sustainable Fashion
+              {t("blog.sustainableFashion")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Street Style
+              {t("blog.streetStyle")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Beauty Tips
+              {t("blog.beautyTips")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Street Style
+              {t("blog.streetStyle")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Vintage Fashion
+              {t("blog.vintageFashion")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Eco Friendly
+              {t("blog.ecoFriendly")}
             </a>
           </li>
           <li>
             <a href="#" className="text-caption-1 link">
-              Tips
+              {t("blog.tips")}
             </a>
           </li>
         </ul>

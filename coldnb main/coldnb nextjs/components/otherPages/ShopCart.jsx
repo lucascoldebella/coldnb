@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import CountdownTimer from "../common/Countdown";
 import { useContextElement } from "@/context/Context";
+import { calculateShipping } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 const discounts = [
   {
     discount: "10% OFF",
@@ -21,28 +23,50 @@ const discounts = [
     code: "Mo234231",
   },
 ];
-const shippingOptions = [
-  {
-    id: "free",
-    label: "Free Shipping",
-    price: 0.0,
-  },
-  {
-    id: "local",
-    label: "Local:",
-    price: 35.0,
-  },
-  {
-    id: "rate",
-    label: "Flat Rate:",
-    price: 35.0,
-  },
-];
 
 export default function ShopCart() {
+  const { t } = useLanguage();
   const [activeDiscountIndex, setActiveDiscountIndex] = useState(1);
-  const [selectedOption, setSelectedOption] = useState(shippingOptions[0]);
+  const [cep, setCep] = useState("");
+  const [shippingResult, setShippingResult] = useState(null);
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState("");
   const { cartProducts, setCartProducts, totalPrice } = useContextElement();
+
+  const shippingPrice = shippingResult ? parseFloat(shippingResult.price) : 0;
+
+  const formatCep = (value) => {
+    const digits = value.replace(/\D/g, "").slice(0, 8);
+    if (digits.length > 5) {
+      return digits.slice(0, 5) + "-" + digits.slice(5);
+    }
+    return digits;
+  };
+
+  const handleCepChange = async (e) => {
+    const formatted = formatCep(e.target.value);
+    setCep(formatted);
+    setShippingError("");
+
+    const digits = formatted.replace(/\D/g, "");
+    if (digits.length === 8) {
+      setShippingLoading(true);
+      setShippingResult(null);
+      try {
+        const result = await calculateShipping(digits);
+        setShippingResult(result);
+      } catch (err) {
+        const errMsg = err.response?.data?.error || err.message || t("checkout.shippingError");
+        setShippingError(typeof errMsg === "string" ? errMsg : t("checkout.shippingError"));
+        setShippingResult(null);
+      } finally {
+        setShippingLoading(false);
+      }
+    } else {
+      setShippingResult(null);
+    }
+  };
+
   const setQuantity = (id, quantity) => {
     if (quantity >= 1) {
       const item = cartProducts.filter((elm) => elm.id == id)[0];
@@ -55,9 +79,6 @@ export default function ShopCart() {
   };
   const removeItem = (id) => {
     setCartProducts((pre) => [...pre.filter((elm) => elm.id != id)]);
-  };
-  const handleOptionChange = (elm) => {
-    setSelectedOption(elm);
   };
 
   useEffect(() => {
@@ -80,7 +101,7 @@ export default function ShopCart() {
                     height={49}
                   />
                   <div className="count-text">
-                    Your cart will expire in
+                    {t("shopCart.cartExpireIn")}
                     <div
                       className="js-countdown time-count"
                       data-timer={600}
@@ -91,16 +112,16 @@ export default function ShopCart() {
                         targetDate={new Date(new Date().getTime() - 30 * 60000)}
                       />
                     </div>
-                    minutes! Please checkout now before your items sell out!
+                    {t("shopCart.minutesCheckout")}
                   </div>
                 </div>
                 <div className="notification-progress">
                   <div className="text">
-                    Buy
+                    {t("shopCart.buy")}
                     <span className="fw-semibold text-primary">
                       $70.00
                     </span>{" "}
-                    more to get <span className="fw-semibold">Freeship</span>
+                    {t("shopCart.moreToGet")} <span className="fw-semibold">{t("shopCart.freeship")}</span>
                   </div>
                   <div className="progress-cart">
                     <div
@@ -118,10 +139,10 @@ export default function ShopCart() {
                   <table className="tf-table-page-cart">
                     <thead>
                       <tr>
-                        <th>Products</th>
-                        <th>Price</th>
-                        <th>Quantity</th>
-                        <th>Total Price</th>
+                        <th>{t("shopCart.products")}</th>
+                        <th>{t("shopCart.price")}</th>
+                        <th>{t("shopCart.quantity")}</th>
+                        <th>{t("shopCart.totalPrice")}</th>
                         <th />
                       </tr>
                     </thead>
@@ -230,9 +251,9 @@ export default function ShopCart() {
                     </tbody>
                   </table>
                   <div className="ip-discount-code">
-                    <input type="text" placeholder="Add voucher discount" />
+                    <input type="text" placeholder={t("shopCart.addVoucherDiscount")} />
                     <button className="tf-btn">
-                      <span className="text">Apply Code</span>
+                      <span className="text">{t("shopCart.applyCode")}</span>
                     </button>
                   </div>
                   <div className="group-discount">
@@ -246,7 +267,7 @@ export default function ShopCart() {
                       >
                         <div className="discount-top">
                           <div className="discount-off">
-                            <div className="text-caption-1">Discount</div>
+                            <div className="text-caption-1">{t("shopCart.discount")}</div>
                             <span className="sale-off text-btn-uppercase">
                               {item.discount}
                             </span>
@@ -260,7 +281,7 @@ export default function ShopCart() {
                             {item.code}
                           </span>
                           <button className="tf-btn">
-                            <span className="text">Apply Code</span>
+                            <span className="text">{t("shopCart.applyCode")}</span>
                           </button>
                         </div>
                       </div>
@@ -269,10 +290,9 @@ export default function ShopCart() {
                 </form>
               ) : (
                 <div>
-                  Your wishlist is empty. Start adding your favorite products to
-                  save them for later!{" "}
+                  {t("shopCart.emptyWishlist")}{" "}
                   <Link className="btn-line" href="/shop-default-grid">
-                    Explore Products
+                    {t("shopCart.exploreProducts")}
                   </Link>
                 </div>
               )}
@@ -280,45 +300,72 @@ export default function ShopCart() {
             <div className="col-xl-4">
               <div className="fl-sidebar-cart">
                 <div className="box-order bg-surface">
-                  <h5 className="title">Order Summary</h5>
+                  <h5 className="title">{t("shopCart.orderSummary")}</h5>
                   <div className="subtotal text-button d-flex justify-content-between align-items-center">
-                    <span>Subtotal</span>
+                    <span>{t("shopCart.subtotal")}</span>
                     <span className="total">${totalPrice.toFixed(2)}</span>
                   </div>
                   <div className="discount text-button d-flex justify-content-between align-items-center">
-                    <span>Discounts</span>
-                    <span className="total">${totalPrice ? "20" : 0}</span>
+                    <span>{t("shopCart.discounts")}</span>
+                    <span className="total">-${totalPrice ? "20.00" : "0.00"}</span>
                   </div>
                   <div className="ship">
-                    <span className="text-button">Shipping</span>
+                    <span className="text-button">{t("shopCart.shipping")}</span>
                     <div className="flex-grow-1">
-                      {shippingOptions.map((option) => (
-                        <fieldset key={option.id} className="ship-item">
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <input
-                            type="radio"
-                            name="ship-check"
-                            className="tf-check-rounded"
-                            id={option.id}
-                            checked={selectedOption === option}
-                            onChange={() => handleOptionChange(option)}
+                            type="text"
+                            placeholder={t("shopCart.enterCep")}
+                            value={cep}
+                            onChange={handleCepChange}
+                            style={{
+                              flex: 1,
+                              padding: "8px 12px",
+                              border: "1px solid #e5e5e5",
+                              borderRadius: 4,
+                              fontSize: 14,
+                            }}
                           />
-                          <label htmlFor={option.id}>
-                            <span>{option.label}</span>
-                            <span className="price">
-                              ${option.price.toFixed(2)}
-                            </span>
-                          </label>
-                        </fieldset>
-                      ))}
+                          {shippingLoading && (
+                            <span style={{ fontSize: 13, color: "#888" }}>...</span>
+                          )}
+                        </div>
+                        {shippingError && (
+                          <p style={{ color: "#dc3545", fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                            {shippingError}
+                          </p>
+                        )}
+                        {shippingResult && (
+                          <div style={{ marginTop: 8, fontSize: 13 }}>
+                            <div className="d-flex justify-content-between">
+                              <span>
+                                {shippingResult.city}, {shippingResult.state} ({shippingResult.zone})
+                              </span>
+                              <span className="fw-semibold">
+                                R$ {parseFloat(shippingResult.price).toFixed(2)}
+                              </span>
+                            </div>
+                            <p style={{ color: "#888", fontSize: 12, marginTop: 2, marginBottom: 0 }}>
+                              {t("shopCart.delivery")} {shippingResult.estimated_days_min}-{shippingResult.estimated_days_max} {t("shopCart.businessDays")}
+                            </p>
+                          </div>
+                        )}
+                        {!shippingResult && !shippingLoading && !shippingError && (
+                          <p style={{ color: "#888", fontSize: 12, marginTop: 4, marginBottom: 0 }}>
+                            {t("shopCart.enterCepCalculate")}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <h5 className="total-order d-flex justify-content-between align-items-center">
-                    <span>Total</span>
+                    <span>{t("shopCart.total")}</span>
                     <span className="total">
                       $
                       {totalPrice
-                        ? (selectedOption.price + totalPrice).toFixed(2)
-                        : 0}
+                        ? (totalPrice - 20 + shippingPrice).toFixed(2)
+                        : "0.00"}
                     </span>
                   </h5>
                   <div className="box-progress-checkout">
@@ -329,15 +376,15 @@ export default function ShopCart() {
                         className="tf-check-rounded"
                       />
                       <label htmlFor="check-agree">
-                        I agree with the
-                        <Link href={`/term-of-use`}>terms and conditions</Link>
+                        {t("shopCart.agreeTerms")}
+                        <Link href={`/term-of-use`}>{t("shopCart.termsConditions")}</Link>
                       </label>
                     </fieldset>
                     <Link href={`/checkout`} className="tf-btn btn-reset">
-                      Process To Checkout
+                      {t("shopCart.processCheckout")}
                     </Link>
                     <p className="text-button text-center">
-                      Or continue shopping
+                      {t("shopCart.continueShopping")}
                     </p>
                   </div>
                 </div>

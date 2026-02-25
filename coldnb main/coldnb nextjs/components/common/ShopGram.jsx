@@ -1,18 +1,30 @@
 "use client";
-import { products2 } from "@/data/products";
-import React from "react";
+import { getProducts } from "@/lib/shopApi";
+import React, { useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function ShopGram({ parentClass = "" }) {
+  const { t } = useLanguage();
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    getProducts({ per_page: 5 })
+      .then((res) => setProducts(res.products || []))
+      .catch(() => {});
+  }, []);
+
+  if (products.length === 0) return null;
+
   return (
     <section className={parentClass}>
       <div className="container">
         <div className="heading-section text-center">
-          <h3 className="heading wow fadeInUp">Shop Instagram</h3>
+          <h3 className="heading wow fadeInUp">{t("homepage.shopInstagram")}</h3>
           <p className="subheading text-secondary wow fadeInUp">
-            Elevate your wardrobe with fresh finds today!
+            {t("homepage.instagramDesc")}
           </p>
         </div>
         <Swiper
@@ -30,16 +42,14 @@ export default function ShopGram({ parentClass = "" }) {
             el: ".spb222",
           }}
         >
-          {products2.slice(0, 5).map((item, i) => (
-            <SwiperSlide key={i}>
+          {products.map((item, i) => (
+            <SwiperSlide key={item.id || i}>
               <div
                 className="gallery-item hover-overlay hover-img wow fadeInUp"
-                data-wow-delay={item.delay}
               >
                 <div className="img-style">
                   <Image
                     className="lazyload img-hover"
-                    data-src={item.imgSrc}
                     alt="image-gallery"
                     src={item.imgSrc}
                     width={640}
@@ -51,7 +61,7 @@ export default function ShopGram({ parentClass = "" }) {
                   className="box-icon hover-tooltip"
                 >
                   <span className="icon icon-eye" />
-                  <span className="tooltip">View Product</span>
+                  <span className="tooltip">{t("homepage.viewProduct")}</span>
                 </Link>
               </div>
             </SwiperSlide>

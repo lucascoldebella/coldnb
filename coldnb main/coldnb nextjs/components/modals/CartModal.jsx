@@ -3,7 +3,8 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useContextElement } from "@/context/Context";
-import { products41 } from "@/data/products";
+import { getProducts } from "@/lib/shopApi";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function CartModal() {
   const {
     cartProducts,
@@ -12,28 +13,35 @@ export default function CartModal() {
     addProductToCart,
     isAddedToCartProducts,
   } = useContextElement();
+  const { t } = useLanguage();
 
   const removeItem = (id) => {
     setCartProducts((pre) => [...pre.filter((elm) => elm.id != id)]);
   };
 
   const [currentOpenPopup, setCurrentOpenPopup] = useState("");
+  const [recommendations, setRecommendations] = useState([]);
+
+  useEffect(() => {
+    getProducts({ featured: true, per_page: 4 })
+      .then((res) => setRecommendations(res.products || []))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="modal fullRight fade modal-shopping-cart" id="shoppingCart">
       <div className="modal-dialog">
         <div className="modal-content">
           <div className="tf-minicart-recommendations">
-            <h6 className="title">You May Also Like</h6>
+            <h6 className="title">{t("cart.youMayAlsoLike")}</h6>
             <div className="wrap-recommendations">
               <div className="list-cart">
-                {products41.map((product, index) => (
+                {recommendations.map((product, index) => (
                   <div className="list-cart-item" key={index}>
                     <div className="image">
                       <Image
                         className="lazyload"
-                        data-src={product.imgSrc}
-                        alt={product.alt}
+                        alt={product.title}
                         src={product.imgSrc}
                         width={600}
                         height={800}
@@ -43,22 +51,22 @@ export default function CartModal() {
                       <div className="name">
                         <Link
                           className="link text-line-clamp-1"
-                          href="/product-detail"
+                          href={`/product-detail/${product.id}`}
                         >
                           {product.title}
                         </Link>
                       </div>
                       <div className="cart-item-bot">
                         <div className="text-button price">
-                          ${product.price.toFixed(2)}
+                          R${product.price.toFixed(2)}
                         </div>
                         <a
                           className="link text-button"
-                          onClick={() => addProductToCart(product.id, 1, false)}
+                          onClick={() => addProductToCart(product, 1, false)}
                         >
                           {isAddedToCartProducts(product.id)
-                            ? "Already Added"
-                            : "Add to cart"}
+                            ? t("cart.addedToCart")
+                            : t("cart.addToCart")}
                         </a>
                       </div>
                     </div>
@@ -69,7 +77,7 @@ export default function CartModal() {
           </div>
           <div className="d-flex flex-column flex-grow-1 h-100">
             <div className="header">
-              <h5 className="title">Shopping Cart</h5>
+              <h5 className="title">{t("cart.shoppingCart")}</h5>
               <span
                 className="icon-close icon-close-popup"
                 data-bs-dismiss="modal"
@@ -80,14 +88,18 @@ export default function CartModal() {
                 <div className="tf-progress-bar">
                   <div
                     className="value"
-                    style={{ width: "0%" }}
+                    style={{ width: totalPrice >= 75 ? "100%" : `${Math.min((totalPrice / 75) * 100, 100)}%` }}
                     data-progress={75}
                   >
                     <i className="icon icon-shipping" />
                   </div>
                 </div>
                 <div className="text-caption-1">
-                  Congratulations! You've got free shipping!
+                  {totalPrice > 0 && totalPrice >= 75
+                    ? t("cart.freeShippingCongrats")
+                    : totalPrice > 0
+                    ? t("cart.freeShippingSpend").replace("{amount}", (75 - totalPrice).toFixed(2))
+                    : t("cart.freeShippingEnjoy")}
                 </div>
               </div>
               <div className="tf-mini-cart-wrap">
@@ -123,7 +135,7 @@ export default function CartModal() {
                                   className="text-button tf-btn-remove remove"
                                   onClick={() => removeItem(product.id)}
                                 >
-                                  Remove
+                                  {t("cart.remove")}
                                 </div>
                               </div>
                               <div className="d-flex align-items-center justify-content-between flex-wrap gap-12">
@@ -139,10 +151,9 @@ export default function CartModal() {
                       </div>
                     ) : (
                       <div className="p-4">
-                        Your Cart is empty. Start adding favorite products to
-                        cart!{" "}
+                        {t("cart.emptyCartMsg")}{" "}
                         <Link className="btn-line" href="/shop-default-grid">
-                          Explore Products
+                          {t("cart.returnToShop")}
                         </Link>
                       </div>
                     )}
@@ -188,7 +199,7 @@ export default function CartModal() {
                           </clipPath>
                         </defs>
                       </svg>
-                      <div className="text-caption-1">Note</div>
+                      <div className="text-caption-1">{t("cart.note")}</div>
                     </div>
                     <div
                       className="tf-mini-cart-tool-btn btn-estimate-shipping"
@@ -230,7 +241,7 @@ export default function CartModal() {
                           strokeLinejoin="round"
                         />
                       </svg>
-                      <div className="text-caption-1">Shipping</div>
+                      <div className="text-caption-1">{t("cart.shipping")}</div>
                     </div>
                     <div
                       className="tf-mini-cart-tool-btn btn-add-coupon"
@@ -258,12 +269,12 @@ export default function CartModal() {
                           strokeLinejoin="round"
                         />
                       </svg>
-                      <div className="text-caption-1">Coupon</div>
+                      <div className="text-caption-1">{t("cart.coupon")}</div>
                     </div>
                   </div>
                   <div className="tf-mini-cart-bottom-wrap">
                     <div className="tf-cart-totals-discounts">
-                      <h5>Subtotal</h5>
+                      <h5>{t("cart.subtotal")}</h5>
                       <h5 className="tf-totals-total-value">
                         ${totalPrice.toFixed(2)}
                       </h5>
@@ -281,9 +292,9 @@ export default function CartModal() {
                         </div>
                       </div>
                       <label htmlFor="CartDrawer-Form_agree">
-                        I agree with
+                        {t("cart.agreeTerms")}{" "}
                         <Link href={`/term-of-use`} title="Terms of Service">
-                          Terms &amp; Conditions
+                          {t("footer.termsConditions")}
                         </Link>
                       </label>
                     </div>
@@ -292,13 +303,13 @@ export default function CartModal() {
                         href={`/shopping-cart`}
                         className="tf-btn w-100 btn-white radius-4 has-border"
                       >
-                        <span className="text">View cart</span>
+                        <span className="text">{t("cart.viewCart")}</span>
                       </Link>
                       <Link
                         href={`/shopping-cart`}
                         className="tf-btn w-100 btn-fill radius-4"
                       >
-                        <span className="text">Check Out</span>
+                        <span className="text">{t("cart.checkOut")}</span>
                       </Link>
                     </div>
                     <div className="text-center">
@@ -306,7 +317,7 @@ export default function CartModal() {
                         className="link text-btn-uppercase"
                         href={`/shop-default-grid`}
                       >
-                        Or continue shopping
+                        {t("cart.continueShopping")}
                       </Link>
                     </div>
                   </div>
@@ -352,7 +363,7 @@ export default function CartModal() {
                           </defs>
                         </svg>
                       </span>
-                      <span className="text-title">Note</span>
+                      <span className="text-title">{t("cart.note")}</span>
                     </label>
                     <form
                       className="form-add-note tf-mini-cart-tool-wrap"
@@ -362,19 +373,19 @@ export default function CartModal() {
                         <textarea
                           name="note"
                           id="Cart-note"
-                          placeholder="Add special instructions for your order..."
+                          placeholder={t("cart.noteInstructions")}
                           defaultValue={""}
                         />
                       </fieldset>
                       <div className="tf-cart-tool-btns">
                         <button type="submit" className="btn-style-2 w-100">
-                          <span className="text text-btn-uppercase">Save</span>
+                          <span className="text text-btn-uppercase">{t("common.save")}</span>
                         </button>
                         <div
                           className="text-center w-100 text-btn-uppercase tf-mini-cart-tool-close"
                           onClick={() => setCurrentOpenPopup("")}
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </div>
                       </div>
                     </form>
@@ -419,7 +430,7 @@ export default function CartModal() {
                         </svg>
                       </span>
                       <span className="text-title">
-                        Estimate shipping rates
+                        {t("cart.estimateShippingRates")}
                       </span>
                     </label>
                     <form
@@ -428,7 +439,7 @@ export default function CartModal() {
                     >
                       <div className="mb_12">
                         <div className="text-caption-1 text-secondary mb_8">
-                          Country/region
+                          {t("cart.countryRegion")}
                         </div>
                         <div className="tf-select">
                           <select className="">
@@ -439,7 +450,7 @@ export default function CartModal() {
                       </div>
                       <div className="mb_12">
                         <div className="text-caption-1 text-secondary mb_8">
-                          State
+                          {t("cart.state")}
                         </div>
                         <div className="tf-select">
                           <select
@@ -497,7 +508,7 @@ export default function CartModal() {
                             </option>
                             <option
                               value="Italy"
-                              data-provinces="[['Agrigento','Agrigento'],['Alessandria','Alessandria'],['Ancona','Ancona'],['Aosta','Aosta Valley'],['Arezzo','Arezzo'],['Ascoli Piceno','Ascoli Piceno'],['Asti','Asti'],['Avellino','Avellino'],['Bari','Bari'],['Barletta-Andria-Trani','Barletta-Andria-Trani'],['Belluno','Belluno'],['Benevento','Benevento'],['Bergamo','Bergamo'],['Biella','Biella'],['Bologna','Bologna'],['Bolzano','South Tyrol'],['Brescia','Brescia'],['Brindisi','Brindisi'],['Cagliari','Cagliari'],['Caltanissetta','Caltanissetta'],['Campobasso','Campobasso'],['Carbonia-Iglesias','Carbonia-Iglesias'],['Caserta','Caserta'],['Catania','Catania'],['Catanzaro','Catanzaro'],['Chieti','Chieti'],['Como','Como'],['Cosenza','Cosenza'],['Cremona','Cremona'],['Crotone','Crotone'],['Cuneo','Cuneo'],['Enna','Enna'],['Fermo','Fermo'],['Ferrara','Ferrara'],['Firenze','Florence'],['Foggia','Foggia'],['Forlì-Cesena','Forlì-Cesena'],['Frosinone','Frosinone'],['Genova','Genoa'],['Gorizia','Gorizia'],['Grosseto','Grosseto'],['Imperia','Imperia'],['Isernia','Isernia'],['L'Aquila','L’Aquila'],['La Spezia','La Spezia'],['Latina','Latina'],['Lecce','Lecce'],['Lecco','Lecco'],['Livorno','Livorno'],['Lodi','Lodi'],['Lucca','Lucca'],['Macerata','Macerata'],['Mantova','Mantua'],['Massa-Carrara','Massa and Carrara'],['Matera','Matera'],['Medio Campidano','Medio Campidano'],['Messina','Messina'],['Milano','Milan'],['Modena','Modena'],['Monza e Brianza','Monza and Brianza'],['Napoli','Naples'],['Novara','Novara'],['Nuoro','Nuoro'],['Ogliastra','Ogliastra'],['Olbia-Tempio','Olbia-Tempio'],['Oristano','Oristano'],['Padova','Padua'],['Palermo','Palermo'],['Parma','Parma'],['Pavia','Pavia'],['Perugia','Perugia'],['Pesaro e Urbino','Pesaro and Urbino'],['Pescara','Pescara'],['Piacenza','Piacenza'],['Pisa','Pisa'],['Pistoia','Pistoia'],['Pordenone','Pordenone'],['Potenza','Potenza'],['Prato','Prato'],['Ragusa','Ragusa'],['Ravenna','Ravenna'],['Reggio Calabria','Reggio Calabria'],['Reggio Emilia','Reggio Emilia'],['Rieti','Rieti'],['Rimini','Rimini'],['Roma','Rome'],['Rovigo','Rovigo'],['Salerno','Salerno'],['Sassari','Sassari'],['Savona','Savona'],['Siena','Siena'],['Siracusa','Syracuse'],['Sondrio','Sondrio'],['Taranto','Taranto'],['Teramo','Teramo'],['Terni','Terni'],['Torino','Turin'],['Trapani','Trapani'],['Trento','Trentino'],['Treviso','Treviso'],['Trieste','Trieste'],['Udine','Udine'],['Varese','Varese'],['Venezia','Venice'],['Verbano-Cusio-Ossola','Verbano-Cusio-Ossola'],['Vercelli','Vercelli'],['Verona','Verona'],['Vibo Valentia','Vibo Valentia'],['Vicenza','Vicenza'],['Viterbo','Viterbo']]"
+                              data-provinces="[['Agrigento','Agrigento'],['Alessandria','Alessandria'],['Ancona','Ancona'],['Aosta','Aosta Valley'],['Arezzo','Arezzo'],['Ascoli Piceno','Ascoli Piceno'],['Asti','Asti'],['Avellino','Avellino'],['Bari','Bari'],['Barletta-Andria-Trani','Barletta-Andria-Trani'],['Belluno','Belluno'],['Benevento','Benevento'],['Bergamo','Bergamo'],['Biella','Biella'],['Bologna','Bologna'],['Bolzano','South Tyrol'],['Brescia','Brescia'],['Brindisi','Brindisi'],['Cagliari','Cagliari'],['Caltanissetta','Caltanissetta'],['Campobasso','Campobasso'],['Carbonia-Iglesias','Carbonia-Iglesias'],['Caserta','Caserta'],['Catania','Catania'],['Catanzaro','Catanzaro'],['Chieti','Chieti'],['Como','Como'],['Cosenza','Cosenza'],['Cremona','Cremona'],['Crotone','Crotone'],['Cuneo','Cuneo'],['Enna','Enna'],['Fermo','Fermo'],['Ferrara','Ferrara'],['Firenze','Florence'],['Foggia','Foggia'],['Forlì-Cesena','Forlì-Cesena'],['Frosinone','Frosinone'],['Genova','Genoa'],['Gorizia','Gorizia'],['Grosseto','Grosseto'],['Imperia','Imperia'],['Isernia','Isernia'],['L'Aquila','L'Aquila'],['La Spezia','La Spezia'],['Latina','Latina'],['Lecce','Lecce'],['Lecco','Lecco'],['Livorno','Livorno'],['Lodi','Lodi'],['Lucca','Lucca'],['Macerata','Macerata'],['Mantova','Mantua'],['Massa-Carrara','Massa and Carrara'],['Matera','Matera'],['Medio Campidano','Medio Campidano'],['Messina','Messina'],['Milano','Milan'],['Modena','Modena'],['Monza e Brianza','Monza and Brianza'],['Napoli','Naples'],['Novara','Novara'],['Nuoro','Nuoro'],['Ogliastra','Ogliastra'],['Olbia-Tempio','Olbia-Tempio'],['Oristano','Oristano'],['Padova','Padua'],['Palermo','Palermo'],['Parma','Parma'],['Pavia','Pavia'],['Perugia','Perugia'],['Pesaro e Urbino','Pesaro and Urbino'],['Pescara','Pescara'],['Piacenza','Piacenza'],['Pisa','Pisa'],['Pistoia','Pistoia'],['Pordenone','Pordenone'],['Potenza','Potenza'],['Prato','Prato'],['Ragusa','Ragusa'],['Ravenna','Ravenna'],['Reggio Calabria','Reggio Calabria'],['Reggio Emilia','Reggio Emilia'],['Rieti','Rieti'],['Rimini','Rimini'],['Roma','Rome'],['Rovigo','Rovigo'],['Salerno','Salerno'],['Sassari','Sassari'],['Savona','Savona'],['Siena','Siena'],['Siracusa','Syracuse'],['Sondrio','Sondrio'],['Taranto','Taranto'],['Teramo','Teramo'],['Terni','Terni'],['Torino','Turin'],['Trapani','Trapani'],['Trento','Trentino'],['Treviso','Treviso'],['Trieste','Trieste'],['Udine','Udine'],['Varese','Varese'],['Venezia','Venice'],['Verbano-Cusio-Ossola','Verbano-Cusio-Ossola'],['Vercelli','Vercelli'],['Verona','Verona'],['Vibo Valentia','Vibo Valentia'],['Vicenza','Vicenza'],['Viterbo','Viterbo']]"
                             >
                               Italy
                             </option>
@@ -518,7 +529,7 @@ export default function CartModal() {
                             </option>
                             <option
                               value="New Zealand"
-                              data-provinces="[['Auckland','Auckland'],['Bay of Plenty','Bay of Plenty'],['Canterbury','Canterbury'],['Chatham Islands','Chatham Islands'],['Gisborne','Gisborne'],['Hawke's Bay','Hawke’s Bay'],['Manawatu-Wanganui','Manawatū-Whanganui'],['Marlborough','Marlborough'],['Nelson','Nelson'],['Northland','Northland'],['Otago','Otago'],['Southland','Southland'],['Taranaki','Taranaki'],['Tasman','Tasman'],['Waikato','Waikato'],['Wellington','Wellington'],['West Coast','West Coast']]"
+                              data-provinces="[['Auckland','Auckland'],['Bay of Plenty','Bay of Plenty'],['Canterbury','Canterbury'],['Chatham Islands','Chatham Islands'],['Gisborne','Gisborne'],['Hawke's Bay','Hawke's Bay'],['Manawatu-Wanganui','Manawatū-Whanganui'],['Marlborough','Marlborough'],['Nelson','Nelson'],['Northland','Northland'],['Otago','Otago'],['Southland','Southland'],['Taranaki','Taranaki'],['Tasman','Tasman'],['Waikato','Waikato'],['Wellington','Wellington'],['West Coast','West Coast']]"
                             >
                               New Zealand
                             </option>
@@ -573,15 +584,12 @@ export default function CartModal() {
                             >
                               United States
                             </option>
-                            <option value="Vietnam" data-provinces="[]">
-                              Vietnam
-                            </option>
                           </select>
                         </div>
                       </div>
                       <fieldset className="">
                         <div className="text-caption-1 text-secondary mb_8">
-                          Postal/Zip Code
+                          {t("cart.postalZipCode")}
                         </div>
                         <input
                           className=""
@@ -597,14 +605,14 @@ export default function CartModal() {
                       <div className="tf-cart-tool-btns">
                         <button type="submit" className="btn-style-2 w-100">
                           <span className="text text-btn-uppercase">
-                            Calculator
+                            {t("cart.calculator")}
                           </span>
                         </button>
                         <div
                           className="text-center w-100 text-btn-uppercase tf-mini-cart-tool-close"
                           onClick={() => setCurrentOpenPopup("")}
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </div>
                       </div>
                     </form>
@@ -648,7 +656,7 @@ export default function CartModal() {
                           </defs>
                         </svg>
                       </span>
-                      <span className="text-title">Add A Coupon Code</span>
+                      <span className="text-title">{t("cart.addCouponCode")}</span>
                     </label>
                     <form
                       className="form-add-coupon tf-mini-cart-tool-wrap"
@@ -656,12 +664,12 @@ export default function CartModal() {
                     >
                       <fieldset className="">
                         <div className="text-caption-1 text-secondary mb_8">
-                          Enter Code
+                          {t("cart.enterCode")}
                         </div>
                         <input
                           className=""
                           type="text"
-                          placeholder="Discount code"
+                          placeholder={t("cart.discountCode")}
                           name="text"
                           tabIndex={2}
                           defaultValue=""
@@ -671,13 +679,13 @@ export default function CartModal() {
                       </fieldset>
                       <div className="tf-cart-tool-btns">
                         <button type="submit" className="btn-style-2 w-100">
-                          <span className="text text-btn-uppercase">Save</span>
+                          <span className="text text-btn-uppercase">{t("common.save")}</span>
                         </button>
                         <div
                           className="text-center w-100 text-btn-uppercase tf-mini-cart-tool-close"
                           onClick={() => setCurrentOpenPopup("")}
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </div>
                       </div>
                     </form>

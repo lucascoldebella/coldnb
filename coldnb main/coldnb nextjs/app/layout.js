@@ -7,6 +7,8 @@ import "../public/css/image-compare-viewer.min.css";
 import { useEffect, useState } from "react";
 import ScrollTop from "@/components/common/ScrollTop";
 import Context from "@/context/Context";
+import { LanguageProvider } from "@/lib/i18n/LanguageContext";
+import { UserAuthProvider } from "@/context/UserAuthContext";
 import CartModal from "@/components/modals/CartModal";
 import QuickView from "@/components/modals/QuickView";
 import QuickAdd from "@/components/modals/QuickAdd";
@@ -20,6 +22,7 @@ import DemoModal from "@/components/modals/DemoModal";
 import Categories from "@/components/modals/Categories";
 import RtlToggler from "@/components/common/RtlToggler";
 import AccountSidebar from "@/components/modals/AccountSidebar";
+import { Toaster } from "react-hot-toast";
 
 export default function RootLayout({ children }) {
   const pathname = usePathname();
@@ -50,8 +53,14 @@ export default function RootLayout({ children }) {
   }, []); // Empty dependency array means this effect runs once on mount and cleans up on unmount
 
   const [scrollDirection, setScrollDirection] = useState("down");
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
     setScrollDirection("up");
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
@@ -81,29 +90,32 @@ export default function RootLayout({ children }) {
     return () => {
       window.removeEventListener("scroll", handleScroll);
     };
-  }, [pathname]);
+  }, [pathname, hasMounted]);
   useEffect(() => {
+    if (!hasMounted) return;
     // Close any open modal
-    const bootstrap = require("bootstrap"); // dynamically import bootstrap
-    const modalElements = document.querySelectorAll(".modal.show");
-    modalElements.forEach((modal) => {
-      const modalInstance = bootstrap.Modal.getInstance(modal);
-      if (modalInstance) {
-        modalInstance.hide();
-      }
-    });
+    import("bootstrap").then((bootstrap) => {
+      const modalElements = document.querySelectorAll(".modal.show");
+      modalElements.forEach((modal) => {
+        const modalInstance = bootstrap.Modal.getInstance(modal);
+        if (modalInstance) {
+          modalInstance.hide();
+        }
+      });
 
-    // Close any open offcanvas
-    const offcanvasElements = document.querySelectorAll(".offcanvas.show");
-    offcanvasElements.forEach((offcanvas) => {
-      const offcanvasInstance = bootstrap.Offcanvas.getInstance(offcanvas);
-      if (offcanvasInstance) {
-        offcanvasInstance.hide();
-      }
+      // Close any open offcanvas
+      const offcanvasElements = document.querySelectorAll(".offcanvas.show");
+      offcanvasElements.forEach((offcanvas) => {
+        const offcanvasInstance = bootstrap.Offcanvas.getInstance(offcanvas);
+        if (offcanvasInstance) {
+          offcanvasInstance.hide();
+        }
+      });
     });
-  }, [pathname]); // Runs every time the route changes
+  }, [pathname, hasMounted]); // Runs every time the route changes
 
   useEffect(() => {
+    if (!hasMounted) return;
     const header = document.querySelector("header");
     if (header) {
       if (scrollDirection == "up") {
@@ -112,34 +124,41 @@ export default function RootLayout({ children }) {
         header.style.top = "-185px";
       }
     }
-  }, [scrollDirection]);
+  }, [scrollDirection, hasMounted]);
   useEffect(() => {
-    const WOW = require("@/utlis/wow");
-    const wow = new WOW.default({
-      mobile: false,
-      live: false,
+    if (!hasMounted) return;
+    import("@/utlis/wow").then((WOW) => {
+      const wow = new WOW.default({
+        mobile: false,
+        live: false,
+      });
+      wow.init();
     });
-    wow.init();
-  }, [pathname]);
+  }, [pathname, hasMounted]);
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <body className="preload-wrapper popup-loader">
         <Context>
-          <RtlToggler />
-          <div id="wrapper">{children}</div>
-          <CartModal />
-          <QuickView />
-          <QuickAdd />
-          <Compare />
-          <MobileMenu />
+          <LanguageProvider>
+            <UserAuthProvider>
+            <RtlToggler />
+            <div id="wrapper">{children}</div>
+            <CartModal />
+            <QuickView />
+            <QuickAdd />
+            <Compare />
+            <MobileMenu />
 
-          <NewsLetterModal />
-          <SearchModal />
-          <SizeGuide />
-          <Wishlist />
-          <DemoModal />
-          <Categories />
-          <AccountSidebar />
+            <NewsLetterModal />
+            <SearchModal />
+            <SizeGuide />
+            <Wishlist />
+            <DemoModal />
+            <Categories />
+            <AccountSidebar />
+            <Toaster position="top-right" />
+            </UserAuthProvider>
+          </LanguageProvider>
         </Context>
       </body>
     </html>

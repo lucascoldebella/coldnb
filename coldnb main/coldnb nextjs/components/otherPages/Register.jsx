@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function Register() {
+  const { t } = useLanguage();
   const [passwordType, setPasswordType] = useState("password");
   const [confirmPasswordType, setConfirmPasswordType] = useState("password");
 
@@ -24,7 +26,7 @@ export default function Register() {
         <div className="login-wrap">
           <div className="left">
             <div className="heading">
-              <h4>Register</h4>
+              <h4>{t("register.title")}</h4>
             </div>
             <form
               onSubmit={(e) => e.preventDefault()}
@@ -35,7 +37,7 @@ export default function Register() {
                   <input
                     className=""
                     type="email"
-                    placeholder="Username or email address*"
+                    placeholder={t("register.usernameOrEmail")}
                     name="email"
                     tabIndex={2}
                     defaultValue=""
@@ -47,7 +49,7 @@ export default function Register() {
                   <input
                     className="input-password"
                     type={passwordType}
-                    placeholder="Password*"
+                    placeholder={t("register.passwordPlaceholder")}
                     name="password"
                     tabIndex={2}
                     defaultValue=""
@@ -72,7 +74,7 @@ export default function Register() {
                   <input
                     className="input-password"
                     type={confirmPasswordType}
-                    placeholder="Confirm Password*"
+                    placeholder={t("register.confirmPasswordPlaceholder")}
                     name="confirmPassword"
                     tabIndex={2}
                     defaultValue=""
@@ -110,30 +112,28 @@ export default function Register() {
                       className="text-secondary-2"
                       htmlFor="login-form_agree"
                     >
-                      I agree to the&nbsp;
+                      {t("register.agreeToTerms")}&nbsp;
                     </label>
                   </div>
                   <Link href={`/term-of-use`} title="Terms of Service">
-                    Terms of User
+                    {t("register.termsOfUse")}
                   </Link>
                 </div>
               </div>
               <div className="button-submit">
                 <button className="tf-btn btn-fill" type="submit">
-                  <span className="text text-button">Register</span>
+                  <span className="text text-button">{t("register.register")}</span>
                 </button>
               </div>
             </form>
           </div>
           <div className="right">
-            <h4 className="mb_8">Already have an account?</h4>
+            <h4 className="mb_8">{t("register.alreadyHaveAccount")}</h4>
             <p className="text-secondary">
-              Welcome back. Sign in to access your personalized experience,
-              saved preferences, and more. We're thrilled to have you with us
-              again!
+              {t("register.welcomeBack")}
             </p>
             <Link href={`/login`} className="tf-btn btn-fill">
-              <span className="text text-button">Login</span>
+              <span className="text text-button">{t("login.login")}</span>
             </Link>
           </div>
         </div>

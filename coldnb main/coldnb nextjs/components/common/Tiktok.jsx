@@ -5,7 +5,9 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import Image from "next/image";
 import Link from "next/link";
 import { Pagination } from "swiper/modules";
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Tiktok({ parentClass = "flat-spacing pt-0" }) {
+  const { t } = useLanguage();
   const videoRefs = useRef([]);
   const [activeVideoIndex, setActiveVideoIndex] = useState(null);
 
@@ -35,10 +37,9 @@ export default function Tiktok({ parentClass = "flat-spacing pt-0" }) {
     <section className={parentClass}>
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3 className="heading">On Tiktok</h3>
+          <h3 className="heading">{t("homepage.onTiktok")}</h3>
           <p className="subheading text-secondary">
-            "Join us on TikTok for exclusive brand releases, unboxings, reviews,
-            and more!"
+            {t("homepage.tiktokDesc")}
           </p>
         </div>
         <Swiper
@@ -82,7 +83,7 @@ export default function Tiktok({ parentClass = "flat-spacing pt-0" }) {
                   loop
                 >
                   <source src={slide.videoSrc} type="video/mp4" />
-                  Your browser does not support the video tag.
+                  {t("homepage.videoNotSupported")}
                 </video>
                 <div className="cls-content">
                   <div className="avatar avt-60 round">

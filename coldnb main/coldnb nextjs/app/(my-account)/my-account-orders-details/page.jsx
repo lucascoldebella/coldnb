@@ -12,7 +12,10 @@ export const metadata = {
   description: "ColdnbMain - eCommerce",
 };
 
-export default function MyAccountOrdersDetailsPage() {
+export default async function MyAccountOrdersDetailsPage({ searchParams }) {
+  const params = await searchParams;
+  const orderId = params?.id || null;
+
   return (
     <>
       <Topbar6 bgColor="bg-main" />
@@ -62,7 +65,7 @@ export default function MyAccountOrdersDetailsPage() {
         <div className="container">
           <div className="my-account-wrap">
             <AccountSidebar />
-            <OrderDetails />
+            <OrderDetails orderId={orderId} />
           </div>
         </div>
       </section>

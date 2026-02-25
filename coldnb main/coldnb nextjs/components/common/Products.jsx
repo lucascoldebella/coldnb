@@ -1,41 +1,24 @@
 "use client";
 import ProductCard1 from "@/components/productCards/ProductCard1";
-import { products } from "@/data/products";
+import { getProducts } from "@/lib/shopApi";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-const tabItems = ["Bottoms", "On pieces", "Tops", "Skirts", "Dresses", "Sale"];
+import { useLanguage } from "@/lib/i18n/LanguageContext";
 export default function Products({ parentClass = "flat-spacing-3 pt-0" }) {
-  const [activeItem, setActiveItem] = useState(tabItems[0]); // Default the first item as active
+  const { t } = useLanguage();
+  const [products, setProducts] = useState([]);
 
-  const [selectedItems, setSelectedItems] = useState([]);
   useEffect(() => {
-    document.getElementById("newArrivals2").classList.remove("filtered");
-    setTimeout(() => {
-      setSelectedItems(
-        products.filter((elm) => elm.tabFilterOptions.includes(activeItem))
-      );
-
-      document.getElementById("newArrivals2").classList.add("filtered");
-    }, 300);
-  }, [activeItem]);
+    getProducts({ per_page: 8 })
+      .then((res) => setProducts(res.products || []))
+      .catch(() => {});
+  }, []);
 
   return (
     <section className={parentClass}>
       <div className="container">
         <div className="heading-section text-center wow fadeInUp">
-          <h3>Today's Top Picks</h3>
-          <ul className="tab-product-v2 justify-content-sm-center">
-            {tabItems.map((item) => (
-              <li key={item} className="nav-tab-item">
-                <a
-                  className={activeItem === item ? "active" : ""}
-                  onClick={() => setActiveItem(item)}
-                >
-                  {item}
-                </a>
-              </li>
-            ))}
-          </ul>
+          <h3>{t("homepage.todaysTopPicks")}</h3>
         </div>
         <div className="flat-animate-tab">
           <div className="tab-content">
@@ -45,13 +28,13 @@ export default function Products({ parentClass = "flat-spacing-3 pt-0" }) {
               role="tabpanel"
             >
               <div className="tf-grid-layout tf-col-2 lg-col-3 xl-col-4">
-                {selectedItems.map((product, i) => (
-                  <ProductCard1 key={i} product={product} />
+                {products.map((product, i) => (
+                  <ProductCard1 key={product.id || i} product={product} />
                 ))}
               </div>
               <div className="sec-btn text-center">
                 <Link href={`/shop-default-grid`} className="btn-line">
-                  View All Products
+                  {t("homepage.viewAllProducts")}
                 </Link>
               </div>
             </div>
