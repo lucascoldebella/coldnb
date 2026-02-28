@@ -60,3 +60,4 @@ gmon.out
 
 # Compiled test binaries
 tests/*.out
+dumps/

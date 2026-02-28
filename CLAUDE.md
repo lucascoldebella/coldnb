@@ -747,6 +747,62 @@ This codebase favors correctness, safety, and clarity over shortcuts.
    - User auth: Check `req->user_id` (set by Supabase middleware)
    - Admin auth: Check `req->admin_id` and `req->admin_role`
 
+## Production Deployment & Dual-Machine Workflow
+
+### Architecture Overview
+Development happens on the **local PC**, production runs on the **VPS (coldnb-vps)**. Code syncs via GitHub. Databases are separate — sync periodically with `db-sync.sh`.
+
+```
+Local PC (development)                    VPS (production)
+├── localhost:3000 (Next.js dev)          ├── coldnb.com (HTTPS, Nginx)
+├── localhost:8080 (C backend)            ├── :3000 Next.js (PM2)
+├── localhost:5432 (PostgreSQL)           ├── :8080 C backend (systemd)
+└── coldnb-backend/config/server.conf     └── /etc/coldnb/server.conf
+```
+
+### VPS Access
+```bash
+ssh coldnb-vps                           # SSH key-only (no password)
+```
+Full VPS details in `~/vps.md` (IP, services, configs, troubleshooting).
+
+### Deploy to Production
+```bash
+./scripts/deploy.sh              # Auto-detect changes, push, build, restart
+./scripts/deploy.sh --frontend   # Frontend only
+./scripts/deploy.sh --backend    # Backend only
+./scripts/deploy.sh --full       # Force full rebuild
+```
+The script: pushes to GitHub → pulls on VPS → rebuilds changed components → restarts services → health check. Each deploy is git-tagged (`deploy-YYYYMMDD-HHMMSS`).
+
+### Database Sync (VPS → Local)
+```bash
+./scripts/db-sync.sh             # Full dump + restore locally
+./scripts/db-sync.sh --dump-only # Just download the dump file
+./scripts/db-sync.sh --schema    # Schema only (no data)
+```
+Dumps are saved in `dumps/` (gitignored, keeps last 5). Use this when you need local DB to match production (e.g., testing with real products, orders, admin data).
+
+### Daily Development Flow
+1. Develop and test locally (localhost)
+2. When ready to deploy: `./scripts/deploy.sh`
+3. Verify on https://coldnb.com
+4. If DB schema changed: apply migration on VPS manually (deploy.sh warns you)
+5. Periodically sync production DB to local: `./scripts/db-sync.sh`
+
+### Important: Two Separate Configs
+- **Local config:** `coldnb-backend/config/server.conf` (points to local paths/secrets)
+- **VPS config:** `/etc/coldnb/server.conf` (points to `/etc/coldnb/secrets/`)
+- **Local .env:** `coldnb main/coldnb nextjs/.env.local` (localhost URLs)
+- **VPS .env:** On VPS at same path (https://coldnb.com URLs)
+- These are NOT synced via git — each machine has its own
+
+### New SQL Migrations
+When adding a new migration file (`sql/006_*.sql`):
+1. Apply locally: `PGPASSWORD=... psql -h 127.0.0.1 -U coldnb -d coldnb -f coldnb-backend/sql/006_*.sql`
+2. Deploy: `./scripts/deploy.sh` (it will warn about SQL changes)
+3. Apply on VPS manually: `ssh coldnb-vps "PGPASSWORD=\$(cat /etc/coldnb/secrets/db_password) psql -h 127.0.0.1 -U coldnb -d coldnb -f /opt/coldnb/coldnb-backend/sql/006_*.sql"`
+
 ## Working Style
 
 ### Session Start
@@ -793,4 +849,5 @@ When making changes, add entry at bottom. If 30 entries exist, delete [1] and re
 [9] 2026-02-18: Static content cleanup + admin main page redesign. Phase 0: Fixed critical toArray bug — replaced with extractArray(res, key) to handle backend's named-key response wrapping ({slides:[...]}, {banners:[...]}). Phase 1: Rewrote /admin/main-page from 4-tab layout to sequential flow matching website order — new HomepageSectionCard wrapper, split BannersManager into CollectionBannersManager + CountdownBannerManager, added CategoriesManager (reads from DB, links to /admin/categories), static sections 6-9 as read-only cards, campaigns collapsed at bottom. Phase 2: Added categories query to public /api/homepage C handler, updated Collections.jsx to accept dynamic data with static fallback. Phase 3: Enhanced products_tabbed section to return tab_products grouped by tab name, updated Products3.jsx to use API-driven products with static fallback. Phase 4: Deleted 33 product detail variant dirs, 29 orphaned homes component dirs, ~20 orphaned productDetails components (kept 8 active ones + their transitive deps). All data/*.js files retained (still imported). Backend compiles zero warnings, frontend builds clean.
 [10] 2026-02-23: Auth flow redesign and bug fixes. Removed page-title breadcrumb strip from /login page. Fixed vertical divider glitch (.login-wrap::before hidden via :has() selector). Redesigned auth buttons: Next/Continue green (#2ecc71, smaller, right-aligned) + Back red (#e74c3c, left-aligned) with new .auth-nav-buttons layout. Hid back button on initial welcome screen. Changed name step text "Qual é o seu nome?" → "Qual seu nome completo?" (PT/EN). Deleted /register page entirely, consolidated all auth flows to /login. Removed redundant register-choose intermediate step — "Criar Conta" now goes directly to register-1. Enhanced cepLookup.js with ViaCEP primary + BrasilAPI fallback. Renamed address step to "Endereço de entrega" (delivery address). Made AuthFlow embeddable for checkout: added embedded, onComplete, embeddedTitle props; when embedded=true renders without section wrapper, calls onComplete() instead of redirecting. Updated all 17 Header files + Login.jsx + ForgotPass.jsx: /register → /login links. Updated translations (pt.json + en.json) with deliveryAddress key. Frontend builds clean, zero warnings.
 [11] 2026-02-24: Eliminated static product data from all active pages — production-ready DB-only product flow. Fixed wishlist showing wrong products: Wishlist modal + page now fetch product details from API via getProductsByIds() instead of filtering static allProducts array. Fixed Compare modal + ProductCompare page with same pattern. Fixed QuickAdd modal to accept full product object instead of ID lookup. Removed allProducts import from Context.jsx; addProductToCart() now requires full product object; wishList/compareItem initialized empty instead of [1,2,3]. Updated all 10 ProductCard variants to pass full product to addProductToCart/setQuickAddItem. CartModal "You May Also Like" now fetches featured products from API instead of hardcoded products41. ProductStikyBottom accepts product prop instead of static data. Product detail page returns 404 for missing products instead of falling back to static data. Nav.jsx mega-menu products fetched from API. Converted all homepage product components (Products, Products2, Products3, Products4, ShopGram) and all 4 jewelry home variants from static imports to API fetch. Converted all 14 shop layout variants (Products2-15) from productMain to API. Fixed Breadcumb.jsx, RelatedProducts, SearchProducts, RecentProducts. Added getProductsByIds() to shopApi.js. Updated CLAUDE.md: added handler_shipping + handler_admin_homepage to backend blueprint, added shipping API endpoints, added /admin/shipping page, fixed product detail variant count. 16 remaining static imports are orphan template components not on any active page. Frontend builds clean.
-[12] 2026-02-24: Full navigation menu management system. Phase 0: Cleaned data/menu.js — removed 30 dead demo items (kept 3 jewelry), emptied swatchLinks/productFeatures, pruned productLinks to 1, removed 4 broken otherPageLinks, simplified Nav.jsx Produtos mega-menu from 4→2 columns. Phase 1: DB migration (sql/005_navigation_menus.sql) with 3 tables: navigation_menus (5 top-level menus), navigation_groups (columns within menus), navigation_items (individual links), all with CASCADE FK, indexes, triggers, seeded with cleaned menu data. Phase 2: Backend C handler (handler_admin_navigation.c/.h) — public GET /api/navigation returns nested JSON (menus→groups→items), 12 admin CRUD endpoints for menus/groups/items including reorder, registered in main.c with admin middleware. Phase 3: Frontend API module (lib/api/adminNavigation.js) with adminNavMenus/adminNavGroups/adminNavItems. Phase 4: Admin UI — NavigationManager (accordion of menu cards with active/inactive toggle), MenuEditor (per-menu settings + group/item CRUD), NavItemFormModal (with image upload for mega_grid), NavGroupFormModal; integrated into /admin/main-page as collapsible section at top. Phase 5: Rewired Nav.jsx, MobileMenu.jsx, DemoModal.jsx from static imports to useNavigationData() hook (lib/hooks/useNavigationData.js) which fetches API with static fallback. Nav.jsx uses MegaGridMenu/MegaColumnsMenu/SimpleMenu sub-components. Menus can be toggled active/inactive from admin — inactive menus hidden from public navigation. data/menu.js retained as fallback. Backend zero warnings, frontend builds clean.
+[12] 2026-02-24: Full navigation menu management system.
+[13] 2026-02-28: VPS migration to 167.172.31.15 (all 10 phases). SSH key-only auth (password disabled). Fixed Next.js telemetry CPU spike (removed /root/.local/share/next binary, disabled telemetry, PM2 ecosystem config). Fixed admin login React error #31 (backend returns error as object, extract .message). Fixed double /api in NEXT_PUBLIC_API_URL. Created deploy.sh (one-command deploy with auto-detect, git tagging, health check) and db-sync.sh (pg_dump VPS → restore local). Added dual-machine workflow docs to CLAUDE.md. Phase 0: Cleaned data/menu.js — removed 30 dead demo items (kept 3 jewelry), emptied swatchLinks/productFeatures, pruned productLinks to 1, removed 4 broken otherPageLinks, simplified Nav.jsx Produtos mega-menu from 4→2 columns. Phase 1: DB migration (sql/005_navigation_menus.sql) with 3 tables: navigation_menus (5 top-level menus), navigation_groups (columns within menus), navigation_items (individual links), all with CASCADE FK, indexes, triggers, seeded with cleaned menu data. Phase 2: Backend C handler (handler_admin_navigation.c/.h) — public GET /api/navigation returns nested JSON (menus→groups→items), 12 admin CRUD endpoints for menus/groups/items including reorder, registered in main.c with admin middleware. Phase 3: Frontend API module (lib/api/adminNavigation.js) with adminNavMenus/adminNavGroups/adminNavItems. Phase 4: Admin UI — NavigationManager (accordion of menu cards with active/inactive toggle), MenuEditor (per-menu settings + group/item CRUD), NavItemFormModal (with image upload for mega_grid), NavGroupFormModal; integrated into /admin/main-page as collapsible section at top. Phase 5: Rewired Nav.jsx, MobileMenu.jsx, DemoModal.jsx from static imports to useNavigationData() hook (lib/hooks/useNavigationData.js) which fetches API with static fallback. Nav.jsx uses MegaGridMenu/MegaColumnsMenu/SimpleMenu sub-components. Menus can be toggled active/inactive from admin — inactive menus hidden from public navigation. data/menu.js retained as fallback. Backend zero warnings, frontend builds clean.
