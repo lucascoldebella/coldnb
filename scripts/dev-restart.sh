@@ -5,7 +5,7 @@
 
 set -e
 
-PROJECT_ROOT="/home/lucas/coldnb"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/coldnb-backend"
 FRONTEND_DIR="$PROJECT_ROOT/coldnb main/coldnb nextjs"
 LOG_DIR="$PROJECT_ROOT/logs"

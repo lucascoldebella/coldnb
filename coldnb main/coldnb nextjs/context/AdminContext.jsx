@@ -99,7 +99,7 @@ export function AdminProvider({ children }) {
       console.error("Login error:", error);
       return {
         success: false,
-        error: error.response?.data?.error || "Login failed"
+        error: error.response?.data?.error?.message || error.response?.data?.error || "Login failed"
       };
     }
   };
