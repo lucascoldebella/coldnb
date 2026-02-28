@@ -123,7 +123,7 @@ ok "VPS code updated"
 # Step 5: Rebuild backend if needed
 if $NEED_BACKEND; then
     info "Rebuilding C backend..."
-    ssh "$VPS" "cd '$VPS_BACKEND' && make clean && make 2>&1 | tail -3 && cp build/bin/coldnb-server /usr/local/bin/coldnb-server && systemctl restart coldnb-server && echo 'Backend restarted'"
+    ssh "$VPS" "cd '$VPS_BACKEND' && make clean && make 2>&1 | tail -3 && systemctl stop coldnb-server && cp build/bin/coldnb-server /usr/local/bin/coldnb-server && systemctl start coldnb-server && echo 'Backend restarted'"
     ok "Backend deployed"
 fi
 
