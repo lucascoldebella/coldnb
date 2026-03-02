@@ -136,11 +136,61 @@ int http_response_json(HttpResponse *resp, HttpStatus status, const char *json) 
     return http_response_set_json(resp, json);
 }
 
+/* Escape a string for safe JSON embedding (handles quotes, backslashes, control chars) */
+static char *json_escape_string(const char *src) {
+    if (src == NULL) {
+        return str_dup("");
+    }
+
+    /* Calculate escaped length */
+    size_t extra = 0;
+    for (const char *p = src; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+        if (c == '"' || c == '\\' || c < 0x20) {
+            extra += (c < 0x20 && c != '\n' && c != '\r' && c != '\t') ? 5 : 1;
+        }
+    }
+
+    char *result = malloc(strlen(src) + extra + 1);
+    if (result == NULL) {
+        return NULL;
+    }
+
+    char *dst = result;
+    for (const char *p = src; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+        switch (c) {
+            case '"':  *dst++ = '\\'; *dst++ = '"';  break;
+            case '\\': *dst++ = '\\'; *dst++ = '\\'; break;
+            case '\n': *dst++ = '\\'; *dst++ = 'n';  break;
+            case '\r': *dst++ = '\\'; *dst++ = 'r';  break;
+            case '\t': *dst++ = '\\'; *dst++ = 't';  break;
+            default:
+                if (c < 0x20) {
+                    dst += sprintf(dst, "\\u%04x", c);
+                } else {
+                    *dst++ = (char)c;
+                }
+                break;
+        }
+    }
+    *dst = '\0';
+    return result;
+}
+
 int http_response_error(HttpResponse *resp, HttpStatus status, const char *message) {
     http_response_set_status(resp, status);
 
+    const char *msg = message ? message : http_status_message(status);
+    char *escaped = json_escape_string(msg);
+    if (escaped == NULL) {
+        return -1;
+    }
+
     char *json = str_printf("{\"error\":{\"status\":%d,\"message\":\"%s\"}}",
-                            (int)status, message ? message : http_status_message(status));
+                            (int)status, escaped);
+    free(escaped);
+
     if (json == NULL) {
         return -1;
     }

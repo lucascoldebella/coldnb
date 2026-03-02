@@ -17,6 +17,12 @@ typedef struct {
     size_t max_request_size;      /* Bytes */
     bool use_thread_per_connection;
 
+    /* Bind address: "127.0.0.1" for loopback only (default), "0.0.0.0" for all */
+    const char *bind_address;
+
+    /* Trust proxy headers (X-Real-IP, X-Forwarded-For) for client IP */
+    bool trust_proxy;
+
     /* CORS settings */
     const char *cors_origins;     /* Comma-separated or "*" */
     const char *cors_methods;

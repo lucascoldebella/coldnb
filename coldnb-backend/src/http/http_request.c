@@ -22,6 +22,12 @@ void http_request_free(HttpRequest *req) {
         return;
     }
 
+    /* Free user_data (e.g. AuthContext) if cleanup function is set */
+    if (req->user_data != NULL && req->user_data_free != NULL) {
+        req->user_data_free(req->user_data);
+        req->user_data = NULL;
+    }
+
     free(req->path);
     free(req->query_string);
     free(req->raw_url);

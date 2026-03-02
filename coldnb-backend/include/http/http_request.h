@@ -64,6 +64,7 @@ typedef struct HttpRequest {
     /* Internal state */
     void *connection;                     /* MHD_Connection pointer */
     void *user_data;                      /* For handler use */
+    void (*user_data_free)(void *);       /* Cleanup function for user_data */
 } HttpRequest;
 
 /* Create a new HTTP request */

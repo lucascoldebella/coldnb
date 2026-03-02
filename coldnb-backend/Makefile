@@ -4,7 +4,10 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror -std=c11 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 CFLAGS += -Iinclude -I/usr/include/postgresql
-CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2
+# Security hardening: stack canaries, buffer overflow detection, ASLR (PIE)
+CFLAGS += -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE
+# Linker hardening: Position Independent Executable (ASLR), Full RELRO (GOT protection)
+LDFLAGS = -pie -Wl,-z,relro,-z,now
 
 # Debug/Release flags
 DEBUG_FLAGS = -g -O0 -DDEBUG
@@ -50,7 +53,7 @@ release: $(TARGET)
 
 # Link main executable
 $(TARGET): $(OBJS) | $(BIN_DIR)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 	@echo "Built: $@"
 
 # Compile source files
@@ -80,7 +83,7 @@ tests: CFLAGS += $(DEBUG_FLAGS)
 tests: $(TEST_BINS)
 
 $(BIN_DIR)/tests/%: $(OBJ_DIR)/tests/%.o $(filter-out $(OBJ_DIR)/main.o,$(OBJS)) | $(BIN_DIR)/tests
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(OBJ_DIR)/tests/%.o: $(TEST_DIR)/%.c | $(OBJ_DIR)/tests
 	$(CC) $(CFLAGS) -MMD -MP -c -o $@ $<

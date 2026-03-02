@@ -63,6 +63,11 @@ static AuthContext *try_authenticate(HttpRequest *req) {
     return ctx;
 }
 
+/* Generic cleanup wrapper for AuthContext */
+static void auth_context_free_wrapper(void *ptr) {
+    auth_context_free((AuthContext *)ptr);
+}
+
 bool auth_middleware_required(HttpRequest *req, HttpResponse *resp, void *user_data) {
     (void)user_data;
 
@@ -72,8 +77,9 @@ bool auth_middleware_required(HttpRequest *req, HttpResponse *resp, void *user_d
         return false;
     }
 
-    /* Store context in request */
+    /* Store context in request with cleanup function */
     req->user_data = ctx;
+    req->user_data_free = auth_context_free_wrapper;
     LOG_DEBUG("Authenticated user: %s", ctx->user_id);
 
     return true;
@@ -87,6 +93,7 @@ bool auth_middleware_optional(HttpRequest *req, HttpResponse *resp, void *user_d
     AuthContext *ctx = try_authenticate(req);
     if (ctx != NULL) {
         req->user_data = ctx;
+        req->user_data_free = auth_context_free_wrapper;
         LOG_DEBUG("Optionally authenticated user: %s", ctx->user_id);
     }
 
@@ -141,6 +148,7 @@ bool auth_middleware_admin(HttpRequest *req, HttpResponse *resp, void *user_data
 
     admin_user_free(admin);
     req->user_data = ctx;
+    req->user_data_free = auth_context_free_wrapper;
 
     LOG_DEBUG("Authenticated admin: %s (role: %s)", ctx->email, ctx->role);
     return true;

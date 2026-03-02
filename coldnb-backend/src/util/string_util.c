@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sodium.h>
 
 char *str_dup(const char *src) {
     if (src == NULL) {
@@ -161,7 +162,13 @@ char *str_url_decode(const char *src) {
             int high = hex_to_int(src[i + 1]);
             int low = hex_to_int(src[i + 2]);
             if (high >= 0 && low >= 0) {
-                dst[j++] = (char)((high << 4) | low);
+                char decoded = (char)((high << 4) | low);
+                /* Reject null bytes — prevents null byte injection attacks */
+                if (decoded == '\0') {
+                    free(dst);
+                    return NULL;
+                }
+                dst[j++] = decoded;
                 i += 2;
                 continue;
             }
@@ -516,22 +523,54 @@ char *str_random(size_t length) {
         "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "0123456789";
-    static bool seeded = false;
-
-    if (!seeded) {
-        srand((unsigned int)time(NULL));
-        seeded = true;
-    }
 
     char *result = malloc(length + 1);
     if (result == NULL) {
         return NULL;
     }
 
+    /* Use libsodium CSPRNG instead of predictable rand() */
     for (size_t i = 0; i < length; i++) {
-        result[i] = charset[rand() % (sizeof(charset) - 1)];
+        result[i] = charset[randombytes_uniform((uint32_t)(sizeof(charset) - 1))];
     }
     result[length] = '\0';
+
+    return result;
+}
+
+char *str_sanitize_log(const char *src) {
+    if (src == NULL) {
+        return str_dup("(null)");
+    }
+
+    size_t src_len = strlen(src);
+    /* Truncate excessively long strings for logging */
+    if (src_len > 200) {
+        src_len = 200;
+    }
+
+    char *result = malloc(src_len + 4);  /* +3 for "..." +1 for null */
+    if (result == NULL) {
+        return NULL;
+    }
+
+    size_t j = 0;
+    for (size_t i = 0; i < src_len; i++) {
+        unsigned char c = (unsigned char)src[i];
+        /* Replace control characters (newlines, tabs, etc.) with space */
+        if (c < 0x20 || c == 0x7F) {
+            result[j++] = ' ';
+        } else {
+            result[j++] = (char)c;
+        }
+    }
+
+    if (strlen(src) > 200) {
+        result[j++] = '.';
+        result[j++] = '.';
+        result[j++] = '.';
+    }
+    result[j] = '\0';
 
     return result;
 }

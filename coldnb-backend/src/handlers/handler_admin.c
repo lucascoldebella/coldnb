@@ -41,12 +41,16 @@ void handler_admin_login(HttpRequest *req, HttpResponse *resp, void *user_data) 
     const char *ip_address = req->client_ip;
     const char *user_agent = http_request_get_header(req, "User-Agent");
 
+    /* Save sanitized copy for logging before freeing the JSON tree */
+    char *safe_username = str_sanitize_log(username);
+
     /* Attempt login */
     AdminSession *session = admin_auth_login(pool, username, password,
                                              ip_address, user_agent);
     cJSON_Delete(body);
 
     if (session == NULL) {
+        free(safe_username);
         http_response_error(resp, HTTP_STATUS_UNAUTHORIZED,
                            "Invalid username or password");
         return;
@@ -80,7 +84,8 @@ void handler_admin_login(HttpRequest *req, HttpResponse *resp, void *user_data) 
     http_response_json(resp, HTTP_STATUS_OK, json);
     free(json);
 
-    LOG_INFO("Admin login: %s", username);
+    LOG_INFO("Admin login: %s", safe_username ? safe_username : "?");
+    free(safe_username);
 }
 
 void handler_admin_logout(HttpRequest *req, HttpResponse *resp, void *user_data) {

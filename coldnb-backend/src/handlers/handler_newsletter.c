@@ -63,12 +63,16 @@ void handler_newsletter_subscribe(HttpRequest *req, HttpResponse *resp, void *us
 
     /* Copy name before freeing body */
     char *name_copy = name ? str_dup(name) : NULL;
+
+    /* Save sanitized copy for logging before freeing the JSON tree */
+    char *safe_email = str_sanitize_log(email);
     cJSON_Delete(body);
 
     PGconn *conn = db_pool_acquire(pool);
     if (conn == NULL) {
         free(email_lower);
         free(name_copy);
+        free(safe_email);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
         return;
     }
@@ -92,6 +96,7 @@ void handler_newsletter_subscribe(HttpRequest *req, HttpResponse *resp, void *us
         db_pool_release(pool, conn);
         free(email_lower);
         free(name_copy);
+        free(safe_email);
         http_response_success(resp, "{\"message\":\"Already subscribed\"}");
         return;
     }
@@ -115,6 +120,7 @@ void handler_newsletter_subscribe(HttpRequest *req, HttpResponse *resp, void *us
         db_pool_release(pool, conn);
         free(email_lower);
         free(name_copy);
+        free(safe_email);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to subscribe");
         return;
     }
@@ -140,7 +146,8 @@ void handler_newsletter_subscribe(HttpRequest *req, HttpResponse *resp, void *us
     http_response_json(resp, HTTP_STATUS_CREATED, json);
     free(json);
 
-    LOG_INFO("Newsletter subscription: %s", email);
+    LOG_INFO("Newsletter subscription: %s", safe_email ? safe_email : "?");
+    free(safe_email);
 }
 
 void handler_newsletter_unsubscribe(HttpRequest *req, HttpResponse *resp, void *user_data) {
@@ -163,11 +170,15 @@ void handler_newsletter_unsubscribe(HttpRequest *req, HttpResponse *resp, void *
     /* Lowercase email */
     char *email_lower = str_dup(email);
     str_to_lower(email_lower);
+
+    /* Save sanitized copy for logging before freeing the JSON tree */
+    char *safe_email = str_sanitize_log(email);
     cJSON_Delete(body);
 
     PGconn *conn = db_pool_acquire(pool);
     if (conn == NULL) {
         free(email_lower);
+        free(safe_email);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
         return;
     }
@@ -205,6 +216,7 @@ void handler_newsletter_unsubscribe(HttpRequest *req, HttpResponse *resp, void *
     free(json);
 
     if (was_subscribed) {
-        LOG_INFO("Newsletter unsubscription: %s", email);
+        LOG_INFO("Newsletter unsubscription: %s", safe_email ? safe_email : "?");
     }
+    free(safe_email);
 }

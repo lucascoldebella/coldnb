@@ -93,42 +93,34 @@ void handler_products_list(HttpRequest *req, HttpResponse *resp, void *user_data
     if (per_page < 1) per_page = 20;
     if (page < 1) page = 1;
 
-    /* Build WHERE clause safely using snprintf */
+    /* Build parameterized WHERE clause — all user input goes through $N placeholders */
     char where[1024];
     size_t where_len = 0;
+    const char *params[10];
+    char param_bufs[4][32];  /* For numeric conversions */
+    int param_count = 0;
+
     where_len = (size_t)snprintf(where, sizeof(where), "is_active = true");
 
     if (category_str != NULL && where_len < sizeof(where) - 1) {
-        char *escaped = db_escape_string(conn, category_str);
-        if (escaped) {
-            where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
-                     " AND category_id = (SELECT id FROM categories WHERE slug = '%s')", escaped);
-            free(escaped);
-        }
+        param_count++;
+        params[param_count - 1] = category_str;
+        where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
+                 " AND category_id = (SELECT id FROM categories WHERE slug = $%d)", param_count);
     }
 
     if (min_price != NULL && where_len < sizeof(where) - 1) {
-        /* Validate min_price is numeric to prevent injection */
-        bool valid = true;
-        for (const char *p = min_price; *p && valid; p++) {
-            if ((*p < '0' || *p > '9') && *p != '.') valid = false;
-        }
-        if (valid) {
-            where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
-                         " AND price >= %s", min_price);
-        }
+        param_count++;
+        params[param_count - 1] = min_price;
+        where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
+                     " AND price >= $%d::numeric", param_count);
     }
 
     if (max_price != NULL && where_len < sizeof(where) - 1) {
-        /* Validate max_price is numeric to prevent injection */
-        bool valid = true;
-        for (const char *p = max_price; *p && valid; p++) {
-            if ((*p < '0' || *p > '9') && *p != '.') valid = false;
-        }
-        if (valid) {
-            where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
-                         " AND price <= %s", max_price);
-        }
+        param_count++;
+        params[param_count - 1] = max_price;
+        where_len += (size_t)snprintf(where + where_len, sizeof(where) - where_len,
+                     " AND price <= $%d::numeric", param_count);
     }
 
     if (is_featured != NULL && strcmp(is_featured, "true") == 0 && where_len < sizeof(where) - 1) {
@@ -141,9 +133,7 @@ void handler_products_list(HttpRequest *req, HttpResponse *resp, void *user_data
                      " AND is_sale = true");
     }
 
-    (void)where_len; /* Suppress unused warning */
-
-    /* Build ORDER BY - use predefined safe values only */
+    /* Build ORDER BY - use predefined safe values only (never user input) */
     const char *order_by = "created_at DESC";
     if (sort != NULL) {
         if (strcmp(sort, "price_asc") == 0) {
@@ -155,27 +145,37 @@ void handler_products_list(HttpRequest *req, HttpResponse *resp, void *user_data
         } else if (strcmp(sort, "newest") == 0) {
             order_by = "created_at DESC";
         }
-        /* Invalid sort values are ignored, keeping default */
     }
+
+    /* Add LIMIT and OFFSET as parameters */
+    int limit_idx = param_count + 1;
+    int offset_idx = param_count + 2;
+    snprintf(param_bufs[0], sizeof(param_bufs[0]), "%d", per_page);
+    snprintf(param_bufs[1], sizeof(param_bufs[1]), "%d", (page - 1) * per_page);
 
     /* Get total count */
     char count_query[2048];
     snprintf(count_query, sizeof(count_query), "SELECT COUNT(*) FROM products WHERE %s", where);
-    int total = db_count(conn, count_query, 0, NULL);
+    int total = db_count(conn, count_query, param_count, param_count > 0 ? params : NULL);
 
     /* Build pagination */
     DbPagination pag;
     db_build_pagination(&pag, page, per_page, total);
 
-    /* Get products */
+    /* Update offset after pagination clamping */
+    snprintf(param_bufs[1], sizeof(param_bufs[1]), "%d", pag.offset);
+    params[limit_idx - 1] = param_bufs[0];
+    params[offset_idx - 1] = param_bufs[1];
+
+    /* Get products — fully parameterized query */
     char query[2048];
     snprintf(query, sizeof(query),
              "SELECT id, name, slug, short_description, sku, price, compare_at_price, "
              "brand, stock_quantity, is_featured, is_new, is_sale, category_id "
-             "FROM products WHERE %s ORDER BY %s LIMIT %d OFFSET %d",
-             where, order_by, pag.per_page, pag.offset);
+             "FROM products WHERE %s ORDER BY %s LIMIT $%d OFFSET $%d",
+             where, order_by, limit_idx, offset_idx);
 
-    PGresult *result = db_exec(conn, query);
+    PGresult *result = db_exec_params(conn, query, offset_idx, params);
     if (!db_result_ok(result)) {
         PQclear(result);
         db_pool_release(pool, conn);
@@ -284,29 +284,27 @@ void handler_products_search(HttpRequest *req, HttpResponse *resp, void *user_da
         return;
     }
 
-    /* Escape search term */
-    char *escaped = db_escape_string(conn, query_str);
-    if (escaped == NULL) {
+    /* Build parameterized search query — search term passed via $1, never interpolated */
+    char *search_pattern = str_printf("%%%s%%", query_str);
+    if (search_pattern == NULL) {
         db_pool_release(pool, conn);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to process query");
         return;
     }
 
-    /* Build search query using ILIKE */
-    char query[1024];
-    snprintf(query, sizeof(query),
-             "SELECT id, name, slug, short_description, price, compare_at_price, brand "
-             "FROM products "
-             "WHERE is_active = true AND ("
-             "name ILIKE '%%%s%%' OR "
-             "description ILIKE '%%%s%%' OR "
-             "brand ILIKE '%%%s%%' OR "
-             "sku ILIKE '%%%s%%'"
-             ") ORDER BY name LIMIT 50",
-             escaped, escaped, escaped, escaped);
-    free(escaped);
+    const char *search_query =
+        "SELECT id, name, slug, short_description, price, compare_at_price, brand "
+        "FROM products "
+        "WHERE is_active = true AND ("
+        "name ILIKE $1 OR "
+        "description ILIKE $1 OR "
+        "brand ILIKE $1 OR "
+        "sku ILIKE $1"
+        ") ORDER BY name LIMIT 50";
 
-    PGresult *result = db_exec(conn, query);
+    const char *search_params[] = { search_pattern };
+    PGresult *result = db_exec_params(conn, search_query, 1, search_params);
+    free(search_pattern);
     if (!db_result_ok(result)) {
         PQclear(result);
         db_pool_release(pool, conn);

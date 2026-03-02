@@ -12,14 +12,16 @@ Supabase auth for users, custom JWT for admins. Stripe payments, Brevo newslette
 ## Architecture
 ```
 ┌─────────────┐     ┌─────────────┐     ┌──────────────────┐     ┌────────────┐
-│   Browser   │────▶│    Nginx    │────▶│  C Backend :8080 │────▶│ PostgreSQL │
-│  Next.js    │     │   (proxy)   │     │  libmicrohttpd   │     │   :5432    │
+│   Browser   │────▶│   Nginx    │────▶│  C Backend :8080 │────▶│ PostgreSQL │
+│  Next.js    │     │  (reverse   │     │  libmicrohttpd   │     │   :5432    │
+│             │     │   proxy)    │     │  127.0.0.1 only  │     │            │
 └─────────────┘     └─────────────┘     └──────────────────┘     └────────────┘
        │                                         │
        │                                         ├──▶ Supabase (user auth)
        │                                         ├──▶ Stripe (payments)
        └──▶ localhost:3000 (dev)                 └──▶ Brevo (email/newsletter)
 ```
+**Production:** Backend binds to `127.0.0.1:8080` (loopback only) — never exposed directly to the internet. Nginx is the only public-facing service, proxying to the backend with rate limiting, scanner blocking, and connection limits.
 
 ### Dual Authentication System
 The system uses **two separate authentication mechanisms**:
@@ -128,7 +130,10 @@ coldnb/
 | `src/db/` | db_connection.c | PostgreSQL connection pool |
 | `src/http/` | http_server.c | libmicrohttpd server |
 | | http_router.c | URL routing with params |
+| `src/middleware/` | middleware_rate_limit.c | Per-IP token bucket rate limiting |
+| | middleware_analytics.c | Session tracking, analytics cookie |
 | `src/util/` | hash_util.c | Argon2id, SHA256, HMAC |
+| | string_util.c | String ops, URL encode/decode, log sanitization |
 
 ### API Endpoints
 | Method | Endpoint | Auth | Handler |
@@ -358,6 +363,9 @@ coldnb-backend/config/secrets/
 
 ### Config File (config/server.conf)
 - Server: port=8080, workers=4, max_connections=1000
+- Bind: `bind_address=127.0.0.1` (production), `0.0.0.0` (local dev)
+- Proxy: `trust_proxy=true` (production, behind Nginx), `false` (local dev)
+- Rate limiting: `rate_limit.requests_per_minute=60`, `rate_limit.burst=10`
 - Database: host=localhost, port=5432, name=coldnb, pool_size=10
 - CORS: origins=localhost:3000, methods=GET,POST,PUT,DELETE
 - Log level: info
@@ -586,13 +594,21 @@ Assume all external input is hostile.
 
 ## 6. Input Validation & Security
 
-- Validate all user input
-- Validate lengths, formats, and ranges
-- Reject early, fail fast
+- Validate all user input at the boundary (handlers)
+- Validate lengths, formats, and ranges before processing
+- Reject early, fail fast — return error before touching the database
 - Never trust:
-  - Network input
+  - Network input (request bodies, headers, query params, URLs)
   - File input
   - Environment variables
+
+### Mandatory Patterns
+- **Parameterized SQL**: Always use `db_exec_params()` with `$N` placeholders. Never use `snprintf` to build SQL with user input, even with `db_escape_string()`.
+- **Log sanitization**: Never log raw user input. Use `str_sanitize_log()` to strip control characters and truncate before passing to `LOG_INFO`/`LOG_WARN`.
+- **cJSON lifetime**: Pointers from `json_get_string(body, ...)` become dangling after `cJSON_Delete(body)`. Always `str_dup()` or `str_sanitize_log()` values you need BEFORE calling `cJSON_Delete()`.
+- **Error messages**: `http_response_error()` auto-escapes the message for JSON output. Never manually build JSON error strings with `snprintf`.
+- **URL decoding**: `str_url_decode()` rejects null bytes (`%00`) — returns NULL on encounter.
+- **Path validation**: `is_valid_path()` in http_server.c rejects paths with `..`, control chars, and lengths over `HTTP_MAX_PATH`.
 
 Defensive coding is mandatory.
 
@@ -649,12 +665,14 @@ Clarity comes first. Optimize where it matters.
 ## 11. Compilation & Warnings
 
 Code must compile with:
-- -Wall -Wextra -Werror
+- `-Wall -Wextra -Werror`
 - Zero warnings tolerated
 
-Recommended hardening flags:
-- -fstack-protector
-- -D_FORTIFY_SOURCE=2
+Active hardening flags (in Makefile):
+- **CFLAGS**: `-fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE`
+- **LDFLAGS**: `-pie -Wl,-z,relro,-z,now`
+- Binary is PIE (Position Independent Executable) for full ASLR
+- Full RELRO (Relocation Read-Only) protects the GOT from overwrite attacks
 
 ---
 
@@ -690,15 +708,152 @@ This codebase favors correctness, safety, and clarity over shortcuts.
 
 ---
 
+## 15. Security Hardening (Production)
+
+This server was previously compromised by Kinsing cryptomining malware via an exposed port. All layers below are mandatory for production deployment. **Never bypass or weaken these protections.**
+
+### Network Layer — Never Expose the Backend Directly
+- Backend binds to `127.0.0.1` only (`server.conf: bind_address=127.0.0.1`)
+- Nginx is the sole public-facing service, reverse-proxying to `:8080`
+- `trust_proxy=true` in production so the backend reads real client IPs from `X-Real-IP` / `X-Forwarded-For` headers set by Nginx
+- In local dev: `bind_address=0.0.0.0`, `trust_proxy=false`
+
+### Rate Limiting (middleware_rate_limit.c)
+Per-IP token bucket algorithm with automatic stale entry cleanup:
+- **Global**: 60 requests/minute per IP (all endpoints)
+- **Auth**: 5 requests/minute per IP (`/api/admin/login`)
+- **Nginx layer**: Additional limits — 2/min for contact/newsletter, 3/min for auth, 20 connections per IP
+- Returns `429 Too Many Requests` with `Retry-After` header
+
+### Request Validation (http_server.c)
+Applied before any handler code runs:
+- Path validation: rejects `..` traversal, control characters, paths > `HTTP_MAX_PATH`
+- Unknown HTTP method rejection (405)
+- Body rejection on GET/HEAD/DELETE methods
+- Request body size limit (`max_request_size` in config)
+
+### Response Hardening
+Security headers added to every response automatically:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Cache-Control: no-store`
+- `Content-Security-Policy: default-src 'none'`
+- Session cookies include `Secure` flag
+
+### SQL Injection Prevention
+**All database queries MUST use parameterized queries:**
+```c
+// CORRECT — parameterized
+const char *query = "SELECT * FROM products WHERE category_id = $1 LIMIT $2";
+const char *params[] = { category_id, limit_str };
+PGresult *result = db_exec_params(conn, query, 2, params);
+
+// WRONG — string interpolation (NEVER do this)
+char query[512];
+snprintf(query, sizeof(query), "SELECT * FROM products WHERE category_id = '%s'", category_id);
+```
+
+### Log Injection Prevention
+User-supplied strings must be sanitized before logging:
+```c
+// CORRECT — sanitize before logging
+char *safe = str_sanitize_log(user_input);
+LOG_INFO("Action by: %s", safe ? safe : "?");
+free(safe);
+
+// WRONG — raw user input in log (enables log injection/forging)
+LOG_INFO("Action by: %s", user_input);
+```
+
+### cJSON Use-After-Free Prevention
+Strings from `json_get_string()` are pointers INTO the cJSON tree. They become dangling after `cJSON_Delete(body)`:
+```c
+const char *name = json_get_string(body, "name", NULL);
+const char *email = json_get_string(body, "email", NULL);
+
+// CORRECT — copy what you need BEFORE deleting
+char *safe_name = str_sanitize_log(name);   // for logging
+char *name_copy = str_dup(name);             // for continued use
+cJSON_Delete(body);
+// safe_name and name_copy are still valid
+
+// WRONG — using name/email after this point is use-after-free
+cJSON_Delete(body);
+LOG_INFO("User: %s", name);  // CRASH or garbage
+```
+
+### JSON Injection Prevention
+`http_response_error()` automatically escapes the message string. Never manually construct JSON error responses with `snprintf`:
+```c
+// CORRECT — auto-escaped
+http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid input");
+
+// WRONG — manual JSON with unescaped user input
+char *json = str_printf("{\"error\":\"%s\"}", user_message);  // injection risk
+```
+
+### Cryptographic Randomness
+Use libsodium for all random values. Never use `rand()`, `random()`, or `time(NULL)` as entropy:
+```c
+// CORRECT — CSPRNG via libsodium
+#include <sodium.h>
+uint32_t idx = randombytes_uniform(charset_len);
+char *token = str_random(32);  // uses randombytes_uniform internally
+
+// WRONG — predictable, trivially exploitable
+srand(time(NULL));
+int idx = rand() % charset_len;
+```
+
+### Binary Hardening (Makefile)
+The compiled binary includes:
+- **PIE** (`-fPIE -pie`): Full ASLR — code, stack, heap all randomized
+- **Full RELRO** (`-Wl,-z,relro,-z,now`): GOT is read-only after startup
+- **Stack protector** (`-fstack-protector-strong`): Canary-based buffer overflow detection
+- **FORTIFY_SOURCE** (`-D_FORTIFY_SOURCE=2`): Runtime buffer overflow checks in libc
+
+Verify with: `file build/bin/coldnb-server` (should say "pie executable") and `readelf -l build/bin/coldnb-server | grep GNU_RELRO`
+
+### systemd Sandboxing (deploy/coldnb-server.service)
+The production service runs with:
+- `MemoryDenyWriteExecute=true` — blocks shellcode execution (W^X enforcement)
+- `ProtectSystem=strict`, `ProtectHome=true`, `PrivateTmp=true`
+- `RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX` — no raw sockets
+- `SystemCallFilter=~@mount @swap @reboot @raw-io @module @debug` — blocked syscall groups
+- `LimitNPROC=64`, `MemoryMax=512M`, `TasksMax=64`, `CPUQuota=80%`
+
+### Nginx Hardening (deploy/nginx.conf)
+- Scanner/bot user-agent blocking (zgrab, masscan, nmap, sqlmap, nikto, etc.)
+- `server_tokens off` — hides Nginx version
+- Connection limits: 20 per IP
+- Rate limits: global 10/s, auth 3/min, contact/newsletter 2/min
+- Proxy headers: `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`
+
+### Security Checklist for New Handlers
+When creating a new handler, verify:
+1. All SQL uses `db_exec_params()` with `$N` placeholders
+2. Input lengths validated before processing
+3. `cJSON_Delete(body)` called only AFTER all needed values are copied
+4. All LOG_INFO/LOG_WARN use `str_sanitize_log()` for user-supplied strings
+5. `db_pool_release()` and all `free()` calls happen on EVERY code path (including errors)
+6. Auth middleware applied in `main.c` if the endpoint requires authentication
+7. Rate limiting middleware applied for sensitive endpoints (login, signup, contact)
+
+---
+
 ## Important Notes & Gotchas
 
 ### Backend
-- **Memory management**: Every `malloc`/`calloc` needs a corresponding `free`. Use `PQclear()` for query results.
+- **Memory management**: Every `malloc`/`calloc` needs a corresponding `free`. Use `PQclear()` for query results. Use `cJSON_Delete()` for parsed JSON.
+- **cJSON string lifetime**: `json_get_string()` returns a pointer into the cJSON tree — it becomes INVALID after `cJSON_Delete(body)`. Copy with `str_dup()` or `str_sanitize_log()` before freeing. This has caused real use-after-free bugs.
+- **user_data cleanup**: `HttpRequest.user_data` is auto-freed if `user_data_free` function pointer is set. Auth middleware sets this automatically for `AuthContext`.
+- **SQL queries**: Always use `db_exec_params()` with `$N` placeholders. Never `snprintf` + `db_escape_string()`.
+- **Logging user input**: Always use `str_sanitize_log()` — strips control chars, truncates to 200 chars. Free the result after logging.
 - **Path handling**: Frontend directory has spaces: `"coldnb main/coldnb nextjs"` - always quote in shell commands
 - **Route registration**: Must register routes in `src/main.c` after creating handler, easy to forget
 - **CORS**: Update `cors.origins` in `server.conf` when deploying
-- **Connection pool**: Always call `release_db_connection(db)` even on error paths
-- **JSON responses**: Use `cJSON` library, remember to `cJSON_Delete()` after use
+- **Connection pool**: Always call `db_pool_release(pool, conn)` even on error paths
+- **Rate limiting**: Global rate limiter runs as first middleware. Auth endpoints get stricter limits via `rate_limit_middleware_auth`.
 
 ### Frontend
 - **Context persistence**: Cart and wishlist use localStorage, may not sync across tabs
@@ -791,11 +946,25 @@ Dumps are saved in `dumps/` (gitignored, keeps last 5). Use this when you need l
 5. Periodically sync production DB to local: `./scripts/db-sync.sh`
 
 ### Important: Two Separate Configs
-- **Local config:** `coldnb-backend/config/server.conf` (points to local paths/secrets)
-- **VPS config:** `/etc/coldnb/server.conf` (points to `/etc/coldnb/secrets/`)
+- **Local config:** `coldnb-backend/config/server.conf` (`bind_address=0.0.0.0`, `trust_proxy=false`)
+- **VPS config:** `/etc/coldnb/server.conf` (`bind_address=127.0.0.1`, `trust_proxy=true`)
 - **Local .env:** `coldnb main/coldnb nextjs/.env.local` (localhost URLs)
 - **VPS .env:** On VPS at same path (https://coldnb.com URLs)
 - These are NOT synced via git — each machine has its own
+
+### File Transfer (scp)
+Upload/download files between local PC and VPS using `scp` (uses the same SSH key as `ssh coldnb-vps`):
+```bash
+# Upload images to VPS
+scp image1.jpg image2.jpg coldnb-vps:/var/www/coldnb/uploads/products/
+
+# Download production images to local for testing
+scp coldnb-vps:/var/www/coldnb/uploads/products/* "coldnb main/coldnb nextjs/public/uploads/products/"
+
+# Upload a whole folder recursively
+scp -r local-folder/ coldnb-vps:/var/www/coldnb/uploads/products/
+```
+Product images should be uploaded on the VPS (via admin panel or scp), not locally — the `uploads/` directory is NOT in git.
 
 ### New SQL Migrations
 When adding a new migration file (`sql/006_*.sql`):
@@ -851,3 +1020,4 @@ When making changes, add entry at bottom. If 30 entries exist, delete [1] and re
 [11] 2026-02-24: Eliminated static product data from all active pages — production-ready DB-only product flow. Fixed wishlist showing wrong products: Wishlist modal + page now fetch product details from API via getProductsByIds() instead of filtering static allProducts array. Fixed Compare modal + ProductCompare page with same pattern. Fixed QuickAdd modal to accept full product object instead of ID lookup. Removed allProducts import from Context.jsx; addProductToCart() now requires full product object; wishList/compareItem initialized empty instead of [1,2,3]. Updated all 10 ProductCard variants to pass full product to addProductToCart/setQuickAddItem. CartModal "You May Also Like" now fetches featured products from API instead of hardcoded products41. ProductStikyBottom accepts product prop instead of static data. Product detail page returns 404 for missing products instead of falling back to static data. Nav.jsx mega-menu products fetched from API. Converted all homepage product components (Products, Products2, Products3, Products4, ShopGram) and all 4 jewelry home variants from static imports to API fetch. Converted all 14 shop layout variants (Products2-15) from productMain to API. Fixed Breadcumb.jsx, RelatedProducts, SearchProducts, RecentProducts. Added getProductsByIds() to shopApi.js. Updated CLAUDE.md: added handler_shipping + handler_admin_homepage to backend blueprint, added shipping API endpoints, added /admin/shipping page, fixed product detail variant count. 16 remaining static imports are orphan template components not on any active page. Frontend builds clean.
 [12] 2026-02-24: Full navigation menu management system.
 [13] 2026-02-28: VPS migration to 167.172.31.15 (all 10 phases). SSH key-only auth (password disabled). Fixed Next.js telemetry CPU spike (removed /root/.local/share/next binary, disabled telemetry, PM2 ecosystem config). Fixed admin login React error #31 (backend returns error as object, extract .message). Fixed double /api in NEXT_PUBLIC_API_URL. Created deploy.sh (one-command deploy with auto-detect, git tagging, health check) and db-sync.sh (pg_dump VPS → restore local). Added dual-machine workflow docs to CLAUDE.md. Phase 0: Cleaned data/menu.js — removed 30 dead demo items (kept 3 jewelry), emptied swatchLinks/productFeatures, pruned productLinks to 1, removed 4 broken otherPageLinks, simplified Nav.jsx Produtos mega-menu from 4→2 columns. Phase 1: DB migration (sql/005_navigation_menus.sql) with 3 tables: navigation_menus (5 top-level menus), navigation_groups (columns within menus), navigation_items (individual links), all with CASCADE FK, indexes, triggers, seeded with cleaned menu data. Phase 2: Backend C handler (handler_admin_navigation.c/.h) — public GET /api/navigation returns nested JSON (menus→groups→items), 12 admin CRUD endpoints for menus/groups/items including reorder, registered in main.c with admin middleware. Phase 3: Frontend API module (lib/api/adminNavigation.js) with adminNavMenus/adminNavGroups/adminNavItems. Phase 4: Admin UI — NavigationManager (accordion of menu cards with active/inactive toggle), MenuEditor (per-menu settings + group/item CRUD), NavItemFormModal (with image upload for mega_grid), NavGroupFormModal; integrated into /admin/main-page as collapsible section at top. Phase 5: Rewired Nav.jsx, MobileMenu.jsx, DemoModal.jsx from static imports to useNavigationData() hook (lib/hooks/useNavigationData.js) which fetches API with static fallback. Nav.jsx uses MegaGridMenu/MegaColumnsMenu/SimpleMenu sub-components. Menus can be toggled active/inactive from admin — inactive menus hidden from public navigation. data/menu.js retained as fallback. Backend zero warnings, frontend builds clean.
+[14] 2026-03-02: Comprehensive security hardening after Kinsing cryptomining compromise. Network: backend bound to 127.0.0.1 (was 0.0.0.0), trust_proxy for Nginx X-Real-IP. Rate limiting: per-IP token bucket middleware (60 req/min global, 5 req/min auth). Input validation: path traversal/control char rejection, unknown method rejection, body rejection on GET/HEAD/DELETE, request size limits. Injection fixes: parameterized SQL queries ($N placeholders) replacing all snprintf+db_escape_string, JSON injection prevention in http_response_error(), null byte rejection in str_url_decode(). Memory safety: fixed 4 use-after-free bugs (handler_contact, handler_newsletter subscribe/unsubscribe, handler_admin login — all cJSON strings used after cJSON_Delete), AuthContext leak fixed via user_data_free function pointer. Log injection: created str_sanitize_log() utility, all user input sanitized before LOG_INFO. Crypto: replaced rand() with libsodium randombytes_uniform() in str_random(). Binary hardening: PIE (-fPIE -pie), Full RELRO (-Wl,-z,relro,-z,now). systemd: MemoryDenyWriteExecute, restricted syscalls/address families, resource limits. Nginx: scanner/bot blocking, connection limits, tighter rate limits, server_tokens off. Security headers on all responses (X-Content-Type-Options, X-Frame-Options, CSP, Cache-Control). Secure flag on session cookie. Added Section 15 (Security Hardening) to CLAUDE.md with mandatory patterns and new-handler checklist.

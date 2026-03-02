@@ -13,6 +13,7 @@
 #include "clients/client_stripe.h"
 #include "clients/client_brevo.h"
 #include "middleware/middleware_analytics.h"
+#include "middleware/middleware_rate_limit.h"
 #include "handlers/handler_products.h"
 #include "handlers/handler_cart.h"
 #include "handlers/handler_admin.h"
@@ -255,6 +256,9 @@ static HttpServer *create_server(const Config *config, int port_override) {
                                                     HTTP_SERVER_DEFAULT_MAX_CONNECTIONS);
     server_config.request_timeout = config_get_size(config, "server.request_timeout",
                                                     HTTP_SERVER_DEFAULT_TIMEOUT);
+    server_config.bind_address = config_get_string(config, "server.bind_address", "127.0.0.1");
+    server_config.trust_proxy = config_get_bool(config, "server.trust_proxy", true);
+
     server_config.cors_origins = config_get_string(config, "cors.origins", "*");
     server_config.cors_methods = config_get_string(config, "cors.methods",
                                                    "GET,POST,PUT,DELETE,OPTIONS");
@@ -266,6 +270,12 @@ static HttpServer *create_server(const Config *config, int port_override) {
 
 /* Register all routes */
 static void register_routes(HttpRouter *router, DbPool *pool) {
+    /* Apply rate limiting FIRST — blocks abusive IPs before any processing */
+    http_router_use(router, rate_limit_middleware, NULL);
+
+    /* Stricter rate limit on auth endpoints */
+    http_router_use_path(router, "/api/admin/login", rate_limit_middleware_auth, NULL);
+
     /* Apply analytics middleware globally (tracks page views) */
     http_router_use(router, analytics_middleware_page_view, NULL);
 
@@ -432,6 +442,18 @@ int main(int argc, char *argv[]) {
     /* Initialize analytics middleware */
     analytics_middleware_init(db_pool);
 
+    /* Initialize rate limiter */
+    if (config_get_bool(config, "rate_limit.enabled", true)) {
+        RateLimitConfig rl_config = {
+            .requests_per_minute = config_get_int(config, "rate_limit.requests_per_minute", 60),
+            .burst = config_get_int(config, "rate_limit.burst", 20),
+            .cleanup_interval = 60
+        };
+        if (rate_limit_init(&rl_config) != 0) {
+            LOG_WARN("Failed to initialize rate limiter");
+        }
+    }
+
     /* Create HTTP server */
     HttpServer *server = create_server(config, port_override);
     if (server == NULL) {
@@ -488,6 +510,7 @@ int main(int argc, char *argv[]) {
 
     g_server = NULL;
     http_server_free(server);
+    rate_limit_shutdown();
     brevo_shutdown();
     stripe_shutdown();
     admin_auth_shutdown();

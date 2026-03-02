@@ -12,6 +12,9 @@ port = 8080
 workers = 4
 max_connections = 1000
 request_timeout = 30
+# CRITICAL: Only listen on loopback — Nginx handles public traffic
+bind_address = 127.0.0.1
+trust_proxy = true
 
 # =============================================================================
 # Database Configuration

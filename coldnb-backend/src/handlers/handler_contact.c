@@ -111,11 +111,17 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     const char *params[] = { name, email, phone, subject, message };
     PGresult *result = db_exec_params(conn, insert_query, 5, params);
 
+    /* Save sanitized copies for logging before freeing the JSON tree */
+    char *safe_name = str_sanitize_log(name);
+    char *safe_email = str_sanitize_log(email);
+
     cJSON_Delete(body);
 
     if (!db_result_ok(result) || !db_result_has_rows(result)) {
         PQclear(result);
         db_pool_release(pool, conn);
+        free(safe_name);
+        free(safe_email);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to submit contact form");
         return;
     }
@@ -135,5 +141,8 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     http_response_json(resp, HTTP_STATUS_CREATED, json);
     free(json);
 
-    LOG_INFO("Contact form submission from: %s <%s>", name, email);
+    LOG_INFO("Contact form submission from: %s <%s>",
+             safe_name ? safe_name : "?", safe_email ? safe_email : "?");
+    free(safe_name);
+    free(safe_email);
 }

@@ -86,8 +86,12 @@ char *str_replace(const char *str, const char *old_str, const char *new_str);
  * Returns new allocated string, caller must free */
 char *str_escape_html(const char *str);
 
-/* Generate a random alphanumeric string
+/* Generate a random alphanumeric string (uses libsodium CSPRNG)
  * Returns new allocated string of specified length, caller must free */
 char *str_random(size_t length);
+
+/* Sanitize a string for safe logging (strips control chars, truncates to 200 chars)
+ * Returns new allocated string, caller must free */
+char *str_sanitize_log(const char *src);
 
 #endif /* COLDNB_STRING_UTIL_H */

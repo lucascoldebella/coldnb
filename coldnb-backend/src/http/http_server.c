@@ -9,6 +9,8 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 
 /* Connection context for tracking request data */
 typedef struct {
@@ -129,6 +131,41 @@ static void handle_cors(HttpServer *server, HttpRequest *req, HttpResponse *resp
                            server->config.cors_headers);
 }
 
+/* Validate request path for malicious patterns */
+static bool is_valid_path(const char *url) {
+    if (url == NULL) {
+        return false;
+    }
+
+    size_t len = strlen(url);
+
+    /* Reject excessively long paths */
+    if (len > HTTP_MAX_PATH) {
+        return false;
+    }
+
+    /* Reject null bytes (shouldn't be possible, but defense in depth) */
+    if (memchr(url, '\0', len) != url + len) {
+        return false;
+    }
+
+    /* Reject path traversal attempts */
+    if (strstr(url, "..") != NULL) {
+        return false;
+    }
+
+    /* Reject non-printable characters (control chars, high bytes in raw path) */
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)url[i];
+        /* Allow printable ASCII + common URL chars (percent-encoded are fine) */
+        if (c < 0x20 || c == 0x7F) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /* Main request handler callback */
 static enum MHD_Result request_handler(void *cls,
                                        struct MHD_Connection *connection,
@@ -144,6 +181,24 @@ static enum MHD_Result request_handler(void *cls,
 
     /* First call - create context */
     if (ctx == NULL) {
+        /* Validate request path before any processing */
+        if (!is_valid_path(url)) {
+            LOG_WARN("Rejected malformed path from client: len=%zu", url ? strlen(url) : 0);
+            struct MHD_Response *r = MHD_create_response_from_buffer(
+                0, "", MHD_RESPMEM_PERSISTENT);
+            MHD_queue_response(connection, MHD_HTTP_BAD_REQUEST, r);
+            MHD_destroy_response(r);
+            return MHD_YES;
+        }
+
+        /* Reject unknown HTTP methods early */
+        if (http_method_from_string(method) == HTTP_METHOD_UNKNOWN) {
+            struct MHD_Response *r = MHD_create_response_from_buffer(
+                0, "", MHD_RESPMEM_PERSISTENT);
+            MHD_queue_response(connection, MHD_HTTP_METHOD_NOT_ALLOWED, r);
+            MHD_destroy_response(r);
+            return MHD_YES;
+        }
         ctx = calloc(1, sizeof(ConnectionContext));
         if (ctx == NULL) {
             return MHD_NO;
@@ -172,12 +227,25 @@ static enum MHD_Result request_handler(void *cls,
         MHD_get_connection_values(connection, MHD_HEADER_KIND,
                                   collect_headers, ctx->request);
 
-        /* Get client IP */
+        /* Extract real client IP from socket address */
         const union MHD_ConnectionInfo *info =
             MHD_get_connection_info(connection, MHD_CONNECTION_INFO_CLIENT_ADDRESS);
         if (info != NULL && info->client_addr != NULL) {
-            /* We'll just store the pointer - MHD owns this */
-            ctx->request->client_ip = "127.0.0.1";  /* Default to localhost */
+            static __thread char ip_buf[INET6_ADDRSTRLEN];
+            const struct sockaddr *sa = info->client_addr;
+            if (sa->sa_family == AF_INET) {
+                const struct sockaddr_in *sin = (const struct sockaddr_in *)sa;
+                inet_ntop(AF_INET, &sin->sin_addr, ip_buf, sizeof(ip_buf));
+                ctx->request->client_ip = ip_buf;
+            } else if (sa->sa_family == AF_INET6) {
+                const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)sa;
+                inet_ntop(AF_INET6, &sin6->sin6_addr, ip_buf, sizeof(ip_buf));
+                ctx->request->client_ip = ip_buf;
+            } else {
+                ctx->request->client_ip = "0.0.0.0";
+            }
+        } else {
+            ctx->request->client_ip = "0.0.0.0";
         }
 
         *con_cls = ctx;
@@ -186,6 +254,15 @@ static enum MHD_Result request_handler(void *cls,
 
     /* Subsequent calls - handle upload data */
     if (*upload_data_size > 0) {
+        /* Reject bodies on methods that shouldn't have them */
+        HttpMethod m = ctx->request->method;
+        if (m == HTTP_METHOD_GET || m == HTTP_METHOD_HEAD || m == HTTP_METHOD_DELETE) {
+            LOG_WARN("Rejected unexpected body on %s request",
+                     http_method_to_string(m));
+            *upload_data_size = 0;
+            return MHD_NO;
+        }
+
         /* Check size limit */
         if (ctx->request->body_size + *upload_data_size > server->config.max_request_size) {
             LOG_WARN("Request body too large");
@@ -198,6 +275,20 @@ static enum MHD_Result request_handler(void *cls,
         }
         *upload_data_size = 0;
         return MHD_YES;
+    }
+
+    /* Resolve real client IP from proxy headers if trusted */
+    if (server->config.trust_proxy) {
+        const char *real_ip = http_request_get_header(ctx->request, "X-Real-IP");
+        if (real_ip != NULL && real_ip[0] != '\0') {
+            ctx->request->client_ip = real_ip;
+        } else {
+            const char *fwd = http_request_get_header(ctx->request, "X-Forwarded-For");
+            if (fwd != NULL && fwd[0] != '\0') {
+                /* Use the first IP in the chain (original client) */
+                ctx->request->client_ip = fwd;
+            }
+        }
     }
 
     /* All data received - process request */
@@ -216,6 +307,12 @@ static enum MHD_Result request_handler(void *cls,
         /* Route the request */
         http_router_handle(server->router, ctx->request, resp);
     }
+
+    /* Add security headers to every response */
+    http_response_add_header(resp, "X-Content-Type-Options", "nosniff");
+    http_response_add_header(resp, "X-Frame-Options", "DENY");
+    http_response_add_header(resp, "Cache-Control", "no-store");
+    http_response_add_header(resp, "Content-Security-Policy", "default-src 'none'");
 
     /* Build and send response */
     struct MHD_Response *mhd_resp = build_mhd_response(resp);
@@ -263,6 +360,8 @@ void http_server_config_defaults(HttpServerConfig *config) {
     config->request_timeout = HTTP_SERVER_DEFAULT_TIMEOUT;
     config->max_request_size = HTTP_SERVER_DEFAULT_MAX_REQUEST_SIZE;
     config->use_thread_per_connection = false;
+    config->bind_address = "127.0.0.1";  /* Loopback only by default — NEVER expose directly */
+    config->trust_proxy = true;           /* Trust X-Real-IP from Nginx */
 }
 
 HttpServer *http_server_create(const HttpServerConfig *config) {
@@ -322,6 +421,18 @@ int http_server_start(HttpServer *server) {
         flags |= MHD_USE_THREAD_PER_CONNECTION;
     }
 
+    /* Setup bind address */
+    struct sockaddr_in bind_addr;
+    memset(&bind_addr, 0, sizeof(bind_addr));
+    bind_addr.sin_family = AF_INET;
+    bind_addr.sin_port = htons((uint16_t)server->config.port);
+
+    const char *addr_str = server->config.bind_address ? server->config.bind_address : "127.0.0.1";
+    if (inet_pton(AF_INET, addr_str, &bind_addr.sin_addr) != 1) {
+        LOG_ERROR("Invalid bind address: %s, falling back to 127.0.0.1", addr_str);
+        inet_pton(AF_INET, "127.0.0.1", &bind_addr.sin_addr);
+    }
+
     /* Start daemon */
     server->daemon = MHD_start_daemon(
         flags,
@@ -334,16 +445,17 @@ int http_server_start(HttpServer *server) {
         MHD_OPTION_CONNECTION_TIMEOUT, (unsigned int)server->config.request_timeout,
         MHD_OPTION_THREAD_POOL_SIZE, (unsigned int)server->config.thread_pool_size,
         MHD_OPTION_CONNECTION_LIMIT, (unsigned int)server->config.max_connections,
+        MHD_OPTION_SOCK_ADDR, (struct sockaddr *)&bind_addr,
         MHD_OPTION_END
     );
 
     if (server->daemon == NULL) {
-        LOG_ERROR("Failed to start HTTP server on port %d", server->config.port);
+        LOG_ERROR("Failed to start HTTP server on %s:%d", addr_str, server->config.port);
         return -1;
     }
 
     server->running = true;
-    LOG_INFO("HTTP server started on port %d", server->config.port);
+    LOG_INFO("HTTP server started on %s:%d", addr_str, server->config.port);
 
     /* Block until shutdown requested */
     while (server->running) {

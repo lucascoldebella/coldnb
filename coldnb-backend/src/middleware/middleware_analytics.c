@@ -58,7 +58,7 @@ void analytics_set_session_cookie(HttpResponse *resp, const char *session_id) {
 
     char cookie_value[256];
     snprintf(cookie_value, sizeof(cookie_value),
-             "%s=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax",
+             "%s=%s; Path=/; Max-Age=%d; HttpOnly; SameSite=Lax; Secure",
              SESSION_COOKIE_NAME, session_id, SESSION_COOKIE_MAX_AGE);
 
     http_response_add_header(resp, "Set-Cookie", cookie_value);

@@ -46,30 +46,42 @@ PrivateTmp=true
 PrivateDevices=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
+ProtectKernelLogs=true
 ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
+RestrictNamespaces=true
 RemoveIPC=true
+LockPersonality=true
+
+# CRITICAL: Prevent shellcode execution (buffer overflow → RCE mitigation)
+MemoryDenyWriteExecute=true
+
+# Restrict network to only what's needed (loopback for backend, outbound for Stripe/Brevo)
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 # Allow read access to config and secrets
 ReadOnlyPaths=/etc/coldnb
 ReadWritePaths=/var/log/coldnb
 ReadWritePaths=/var/www/coldnb/uploads
 
-# Capabilities
+# Capabilities — none needed (we bind to 8080 > 1024)
 CapabilityBoundingSet=
 AmbientCapabilities=
 
-# System call filter
+# System call filter — block dangerous syscalls that Kinsing shellcode would use
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
-SystemCallFilter=~@privileged @resources
+SystemCallFilter=~@privileged @resources @mount @swap @reboot @raw-io @module @debug
 
 # Limit resources
 LimitNOFILE=65535
-LimitNPROC=4096
-MemoryMax=1G
-TasksMax=256
+LimitNPROC=64
+MemoryMax=512M
+TasksMax=64
+CPUQuota=80%
 
 # Logging
 StandardOutput=journal
