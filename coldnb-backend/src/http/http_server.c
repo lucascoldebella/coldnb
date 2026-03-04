@@ -144,10 +144,11 @@ static bool is_valid_path(const char *url) {
         return false;
     }
 
-    /* Reject null bytes (shouldn't be possible, but defense in depth) */
-    if (memchr(url, '\0', len) != url + len) {
-        return false;
-    }
+    /*
+     * url is already a C string; strlen() guarantees the first NUL is at
+     * position len, so searching only the first len bytes is not useful and
+     * would always fail here.
+     */
 
     /* Reject path traversal attempts */
     if (strstr(url, "..") != NULL) {

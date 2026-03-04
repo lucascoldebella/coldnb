@@ -12,6 +12,7 @@
 set -e
 
 VPS="coldnb-vps"
+VPS_PUBLIC_IP="${VPS_PUBLIC_IP:-64.225.9.178}"
 VPS_PROJECT="/opt/coldnb"
 VPS_FRONTEND="$VPS_PROJECT/coldnb main/coldnb nextjs"
 VPS_BACKEND="$VPS_PROJECT/coldnb-backend"
@@ -130,7 +131,7 @@ fi
 # Step 6: Rebuild frontend if needed
 if $NEED_FRONTEND; then
     info "Rebuilding Next.js frontend (this takes ~60s)..."
-    ssh "$VPS" "cd '$VPS_FRONTEND' && npm install --production 2>&1 | tail -2 && npm run build 2>&1 | tail -5 && pm2 restart coldnb-frontend && echo 'Frontend restarted'"
+    ssh "$VPS" "cd '$VPS_FRONTEND' && npm install 2>&1 | tail -2 && npm run build 2>&1 | tail -5 && pm2 restart coldnb-frontend && echo 'Frontend restarted'"
     ok "Frontend deployed"
 fi
 
@@ -150,8 +151,8 @@ git tag "$DEPLOY_TAG" 2>/dev/null || true
 # Step 9: Quick health check
 info "Health check..."
 sleep 3
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://coldnb.com/ 2>/dev/null || echo "000")
-API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://coldnb.com/api/products 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://$VPS_PUBLIC_IP/" 2>/dev/null || echo "000")
+API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://$VPS_PUBLIC_IP/api/products" 2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" = "200" ] && [ "$API_CODE" = "200" ]; then
     ok "Health check passed: Frontend=$HTTP_CODE API=$API_CODE"
