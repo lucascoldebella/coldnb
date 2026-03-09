@@ -102,7 +102,7 @@ export default function Footer1({
                       <Link href={`/`}>
                         <Image
                           alt=""
-                          src={dark ? "/images/logo/logo-white.svg" : "/images/logo/logo.svg"}
+                          src={dark ? "/images/logo/logo-white.svg" : "/images/logo/logo.png"}
                           width={127}
                           height={24}
                           style={{ width: "auto", height: "auto" }}
