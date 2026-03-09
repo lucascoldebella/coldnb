@@ -20,7 +20,7 @@ import SizeGuide from "@/components/modals/SizeGuide";
 import Wishlist from "@/components/modals/Wishlist";
 import DemoModal from "@/components/modals/DemoModal";
 import Categories from "@/components/modals/Categories";
-import RtlToggler from "@/components/common/RtlToggler";
+import { ThemeProvider } from "@/context/ThemeContext";
 import AccountSidebar from "@/components/modals/AccountSidebar";
 import { Toaster } from "react-hot-toast";
 
@@ -136,12 +136,12 @@ export default function RootLayout({ children }) {
     });
   }, [pathname, hasMounted]);
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body className="preload-wrapper popup-loader">
         <Context>
+          <ThemeProvider>
           <LanguageProvider>
             <UserAuthProvider>
-            <RtlToggler />
             <div id="wrapper">{children}</div>
             <CartModal />
             <QuickView />
@@ -159,6 +159,7 @@ export default function RootLayout({ children }) {
             <Toaster position="top-right" />
             </UserAuthProvider>
           </LanguageProvider>
+          </ThemeProvider>
         </Context>
       </body>
     </html>
