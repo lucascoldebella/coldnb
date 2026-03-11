@@ -1,11 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUserAuth } from "@/context/UserAuthContext";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { addressesApi } from "@/lib/userApi";
 import { lookupCep, formatCep } from "@/lib/cepLookup";
 import { maskPhone, unmaskPhone } from "@/lib/phoneMask";
+import { appendNextPath, getSameOriginReferrerPath, sanitizeNextPath } from "@/lib/authRedirect";
 import SocialButtons from "./SocialButtons";
 
 export default function AuthFlow({
@@ -14,13 +15,29 @@ export default function AuthFlow({
   onComplete,
   embeddedTitle,
 }) {
-  const { signIn, signUp, updateProfile, isAuthenticated, isLoading: authLoading } = useUserAuth();
+  const {
+    signIn,
+    signUp,
+    updateProfile,
+    isAuthenticated,
+    isProfileComplete,
+    profile,
+    user,
+    isLoading: authLoading,
+    getAuthRedirectUrl,
+  } = useUserAuth();
   const { t } = useLanguage();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSocialCompletion = initialMode === "social-complete";
+  const requestedNextPath = sanitizeNextPath(searchParams.get("next"), "");
+  const returnTo = requestedNextPath || (!isSocialCompletion ? getSameOriginReferrerPath("") : "") || "/my-account";
+  const completeProfilePath = appendNextPath("/complete-profile", returnTo);
 
   const [step, setStep] = useState("initial");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [fadeClass, setFadeClass] = useState("auth-step-enter");
 
   // Login fields
@@ -49,14 +66,86 @@ export default function AuthFlow({
 
   // Redirect if already authenticated (only on standalone page, not embedded)
   useEffect(() => {
-    if (!embedded && !authLoading && isAuthenticated && step !== "register-5") {
-      router.push("/my-account");
+    if (!embedded && !authLoading && isAuthenticated && !isSocialCompletion && step !== "register-5") {
+      router.push(isProfileComplete ? returnTo : completeProfilePath);
     }
-  }, [isAuthenticated, authLoading, router, step, embedded]);
+  }, [isAuthenticated, authLoading, isProfileComplete, router, step, embedded, isSocialCompletion, returnTo, completeProfilePath]);
+
+  useEffect(() => {
+    if (!isSocialCompletion) return;
+
+    const suggestedName =
+      profile?.full_name ||
+      user?.user_metadata?.full_name ||
+      user?.user_metadata?.name ||
+      "";
+    const suggestedPhone = profile?.phone || user?.user_metadata?.phone || "";
+
+    if (suggestedName && !fullName) {
+      setFullName(suggestedName);
+    }
+
+    if (user?.email && !regEmail) {
+      setRegEmail(user.email);
+    }
+
+    if (suggestedPhone && !phone) {
+      setPhone(maskPhone(suggestedPhone));
+    }
+  }, [
+    isSocialCompletion,
+    profile?.full_name,
+    profile?.phone,
+    user?.email,
+    user?.user_metadata?.full_name,
+    user?.user_metadata?.name,
+    user?.user_metadata?.phone,
+    fullName,
+    regEmail,
+    phone,
+  ]);
+
+  useEffect(() => {
+    if (!isSocialCompletion || embedded || authLoading) return;
+
+    if (!isAuthenticated) {
+      router.push(appendNextPath("/login", returnTo));
+      return;
+    }
+
+    if (isProfileComplete) {
+      router.push(returnTo);
+      return;
+    }
+
+    if (step !== "initial") {
+      return;
+    }
+
+    const hasName = Boolean(
+      (profile?.full_name || fullName || user?.user_metadata?.full_name || user?.user_metadata?.name || "").trim()
+    );
+
+    setStep(hasName ? "social-2" : "social-1");
+  }, [
+    authLoading,
+    embedded,
+    fullName,
+    isAuthenticated,
+    isProfileComplete,
+    isSocialCompletion,
+    profile?.full_name,
+    router,
+    step,
+    returnTo,
+    user?.user_metadata?.full_name,
+    user?.user_metadata?.name,
+  ]);
 
   const changeStep = (newStep) => {
     setFadeClass("auth-step-exit");
     setError("");
+    setNotice("");
     setTimeout(() => {
       setStep(newStep);
       setFadeClass("auth-step-enter");
@@ -67,7 +156,7 @@ export default function AuthFlow({
     if (embedded && onComplete) {
       onComplete();
     } else {
-      router.push("/my-account");
+      router.push(returnTo);
     }
   };
 
@@ -94,6 +183,7 @@ export default function AuthFlow({
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setNotice("");
 
     const { error: signInError } = await signIn(loginEmail, loginPassword);
     setIsLoading(false);
@@ -120,19 +210,30 @@ export default function AuthFlow({
 
     setIsLoading(true);
     setError("");
+    setNotice("");
 
-    const { error: signUpError } = await signUp(regEmail, regPassword);
+    const { data: signUpData, error: signUpError } = await signUp(regEmail, regPassword, {
+      emailRedirectTo: getAuthRedirectUrl(returnTo, "confirm-email"),
+      data: {
+        full_name: fullName.trim(),
+        phone: unmaskPhone(phone),
+      },
+    });
     if (signUpError) {
       setIsLoading(false);
       setError(signUpError.message);
       return;
     }
 
-    // Sign in immediately after sign up
-    const { error: signInError } = await signIn(regEmail, regPassword);
-    if (signInError) {
+    if (!signUpData?.session) {
+      setLoginEmail(regEmail);
       setIsLoading(false);
-      setError(signInError.message);
+      setNotice(t("auth.confirmEmailNotice"));
+      setFadeClass("auth-step-exit");
+      setTimeout(() => {
+        setStep("login");
+        setFadeClass("auth-step-enter");
+      }, 200);
       return;
     }
 
@@ -148,6 +249,35 @@ export default function AuthFlow({
 
     setIsLoading(false);
     changeStep("register-5");
+  };
+
+  const handleCompleteSocialProfile = async (e) => {
+    e.preventDefault();
+
+    if (!fullName.trim()) {
+      setError(t("auth.fullNameRequired"));
+      return;
+    }
+
+    if (unmaskPhone(phone).length < 10) {
+      setError(t("auth.phoneRequired"));
+      return;
+    }
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await updateProfile({
+        full_name: fullName.trim(),
+        phone: unmaskPhone(phone),
+      });
+      changeStep("social-3");
+    } catch {
+      setError(t("auth.profileUpdateError"));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Save address handler (step 5)
@@ -176,18 +306,19 @@ export default function AuthFlow({
     setIsLoading(false);
   };
 
-  // Get current register step number (1-5) for progress dots
-  const getRegisterStep = () => {
-    const match = step.match(/register-(\d)/);
+  const getProgressStep = () => {
+    const pattern = isSocialCompletion ? /social-(\d)/ : /register-(\d)/;
+    const match = step.match(pattern);
     return match ? parseInt(match[1]) : 0;
   };
 
   const renderProgressDots = () => {
-    const current = getRegisterStep();
+    const current = getProgressStep();
     if (current < 1) return null;
+    const totalSteps = isSocialCompletion ? 3 : 5;
     return (
       <div className="auth-step-dots">
-        {[1, 2, 3, 4, 5].map((n) => (
+        {Array.from({ length: totalSteps }, (_, index) => index + 1).map((n) => (
           <span
             key={n}
             className={`auth-step-dot ${n === current ? "active" : ""} ${n < current ? "completed" : ""}`}
@@ -246,6 +377,12 @@ export default function AuthFlow({
         </div>
       )}
 
+      {notice && (
+        <div className="alert alert-success mb_20" style={{ fontSize: 14, padding: "10px 16px" }}>
+          {notice}
+        </div>
+      )}
+
       {/* INITIAL: Choose Login or Register */}
       {step === "initial" && (
         <div className="auth-step">
@@ -270,7 +407,69 @@ export default function AuthFlow({
           <div className="auth-divider">
             <span>{t("auth.orContinueWith")}</span>
           </div>
-          <SocialButtons />
+      <SocialButtons nextPath={completeProfilePath} />
+        </div>
+      )}
+
+      {/* SOCIAL STEP 1: Full Name */}
+      {step === "social-1" && (
+        <div className="auth-step">
+          <div className="heading text-center mb_20">
+            <h4>{t("auth.whatsYourName")}</h4>
+            <p className="text-secondary mt_8">{regEmail}</p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (fullName.trim()) changeStep("social-2");
+            }}
+            className="form-login"
+          >
+            <div className="wrap">
+              <fieldset>
+                <input
+                  type="text"
+                  placeholder={t("auth.fullName")}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </fieldset>
+            </div>
+            {renderNavButtons({
+              nextLabel: t("auth.next"),
+            })}
+          </form>
+        </div>
+      )}
+
+      {/* SOCIAL STEP 2: Phone */}
+      {step === "social-2" && (
+        <div className="auth-step">
+          <div className="heading text-center mb_20">
+            <h4>{t("auth.whatsYourPhone")}</h4>
+            <p className="text-secondary mt_8">{regEmail}</p>
+          </div>
+          <form onSubmit={handleCompleteSocialProfile} className="form-login">
+            <div className="wrap">
+              <fieldset>
+                <input
+                  type="tel"
+                  placeholder={t("auth.phonePlaceholder")}
+                  value={phone}
+                  onChange={(e) => setPhone(maskPhone(e.target.value))}
+                  required
+                  autoFocus
+                />
+              </fieldset>
+            </div>
+            {renderNavButtons({
+              backStep: "social-1",
+              nextLabel: isLoading ? t("auth.saving") : t("auth.next"),
+              disabled: isLoading,
+            })}
+          </form>
         </div>
       )}
 
@@ -474,8 +673,8 @@ export default function AuthFlow({
         </div>
       )}
 
-      {/* REGISTER STEP 5: Delivery Address */}
-      {step === "register-5" && (
+      {/* FINAL STEP: Delivery Address */}
+      {(step === "register-5" || step === "social-3") && (
         <div className="auth-step">
           <div className="heading text-center mb_20">
             <h4>{t("auth.deliveryAddress")}</h4>
@@ -559,14 +758,30 @@ export default function AuthFlow({
               <button
                 type="button"
                 className="tf-btn btn-auth-back"
-                onClick={handleDone}
+                onClick={step === "social-3" ? () => changeStep("social-2") : handleDone}
               >
-                <span className="text">{t("auth.skipForNow")}</span>
+                <span className="text">
+                  {step === "social-3" ? t("auth.back") : t("auth.skipForNow")}
+                </span>
               </button>
               <button className="tf-btn btn-auth-next" type="submit" disabled={isLoading}>
-                <span className="text">{t("auth.saveAddress")}</span>
+                <span className="text">
+                  {isLoading ? t("auth.savingAddress") : t("auth.saveAddress")}
+                </span>
               </button>
             </div>
+            {step === "social-3" && (
+              <div className="text-center mt_12">
+                <button
+                  type="button"
+                  className="btn-link text-secondary"
+                  onClick={handleDone}
+                  disabled={isLoading}
+                >
+                  {t("auth.skipForNow")}
+                </button>
+              </div>
+            )}
           </form>
         </div>
       )}

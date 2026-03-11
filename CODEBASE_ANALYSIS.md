@@ -1,0 +1,754 @@
+# Coldnb — Complete Codebase & Product Analysis
+
+> Generated: 2026-03-10 | Analyst: Context Engineering Session
+
+---
+
+## 1. Executive Summary
+
+Coldnb is a full-stack jewelry e-commerce platform built for the Brazilian market. It consists of a Next.js 15 + React 19 customer storefront (bilingual PT-BR/EN) and a C/libmicrohttpd backend connected to PostgreSQL, with Supabase handling customer authentication and Brevo providing email delivery. The admin dashboard supports product management, order operations, customer data, analytics, and email configuration.
+
+The platform demonstrates significant technical ambition — a custom C backend for performance, a mature dual-auth architecture, a comprehensive PostgreSQL schema covering the full e-commerce domain, and a production-ready deployment stack on DigitalOcean with Nginx, PM2, systemd, UFW, CrowdSec, and fail2ban. Email transactional flows (order confirmation, status updates, contact notifications) are live.
+
+However, the platform is **not yet production-ready** for real commerce. The three most critical gaps are: (1) **Stripe payment integration is incomplete** — the backend client exists but is unconfigured on VPS; (2) **frontend product browsing uses a 133KB static data file** disconnected from the live database, meaning inventory, pricing, and availability shown to customers are not real; (3) **cart is split between two unreconciled systems** (localStorage for guests, server-side for authenticated users) with no merge on login.
+
+**Top 3 recommended next actions:**
+1. Complete and configure Stripe payment flow end-to-end (including webhook handling for order status automation)
+2. Connect frontend product listing and detail pages to `/api/products` backend endpoint (replace static `data/products.js` for dynamic data)
+3. Implement cart merge: reconcile localStorage cart with server-side cart on user login
+
+---
+
+## 2. System Architecture Overview
+
+### Architecture Style
+**Modular Monolith (frontend) + Monolithic C HTTP Server (backend)**. No microservices. All backend logic runs in a single binary (`coldnb-server`) registered as a systemd service.
+
+The architecture deliberately separates concerns by layer: Nginx handles SSL/TLS termination, rate limiting, and public exposure; Next.js handles the full customer UX (SSR + client-side React); the C backend handles all business logic and data operations; PostgreSQL is the single source of truth for persistent data.
+
+```mermaid
+graph TD
+    Browser["Browser / Mobile"]
+    Nginx["Nginx :443\n(SSL, Rate Limit,\nScanner Block)"]
+    NextJS["Next.js :3000\n(PM2)\nCustomer Storefront\n+ Admin Dashboard"]
+    Backend["C Backend :8080\n(systemd, loopback)\nlibmicrohttpd"]
+    Postgres["PostgreSQL :5432"]
+    Supabase["Supabase\n(Customer Auth)"]
+    Stripe["Stripe\n(Payments)"]
+    BrevoAPI["Brevo API v3\n(Business Emails)"]
+    BrevoSMTP["Brevo SMTP\n(Auth Emails via Supabase)"]
+
+    Browser --> Nginx
+    Nginx --> NextJS
+    Nginx --> Backend
+    NextJS --> Supabase
+    Backend --> Postgres
+    Backend --> Supabase
+    Backend --> Stripe
+    Backend --> BrevoAPI
+    Supabase --> BrevoSMTP
+```
+
+---
+
+## 3. Technology Stack
+
+| Layer | Technology | Version | Purpose |
+|-------|-----------|---------|---------|
+| Frontend framework | Next.js | 15.x | App Router, SSR + CSR hybrid |
+| UI library | React | 19.0.0 | Component model |
+| CSS framework | Bootstrap | 5.3.2 | Layout and utilities |
+| Styling | SCSS | — | Custom brand styles |
+| Icons | icomoon (custom) | — | E-commerce icon set |
+| Animations | WOW.js | — | Scroll reveal animations |
+| Carousels | Swiper | 11.1.15 | Product carousels |
+| Charts | Chart.js + react-chartjs-2 | 4.x | Admin analytics charts |
+| HTTP client | Axios | 1.x | API calls (admin API with JWT interceptor) |
+| Customer auth client | @supabase/supabase-js | 2.x | Supabase Auth integration |
+| Date utilities | date-fns | 3.x | Date formatting |
+| Image handling | react-dropzone + react-easy-crop | — | Admin image upload/crop |
+| Image viewer | PhotoSwipe | 5.x | Product image gallery |
+| Notifications | react-hot-toast | — | Cart/wishlist toast messages |
+| Backend language | C | GCC 9+ | High-performance HTTP server |
+| Backend HTTP | libmicrohttpd | — | HTTP server library |
+| Backend DB driver | libpq | — | PostgreSQL C client |
+| Backend HTTP client | libcurl | — | External API calls (Brevo, Stripe) |
+| Backend JSON | cJSON | — | JSON parsing/generation |
+| Backend crypto | libsodium | — | Argon2id password hashing |
+| Backend TLS | OpenSSL | — | JWT signature verification |
+| Backend UUID | libuuid | — | UUID generation |
+| Database | PostgreSQL | 13+ | Primary data store |
+| Customer auth provider | Supabase | — | Managed auth (JWT, email) |
+| Payment provider | Stripe | — | Payment processing (partial) |
+| Transactional email | Brevo API v3 | — | Business emails |
+| Auth email relay | Brevo SMTP | — | Auth emails via Supabase |
+| Process manager | PM2 | — | Next.js process management |
+| System service | systemd | — | Backend service management |
+| Reverse proxy | Nginx | — | SSL, rate limiting, routing |
+| SSL | Let's Encrypt | — | TLS certificates |
+| Firewall | UFW | — | Port restrictions |
+| Threat intelligence | CrowdSec | — | Automated threat blocking |
+| Brute-force protection | fail2ban | — | SSH protection |
+| Platform | DigitalOcean Ubuntu 24.04 | — | 2vCPU/2GB droplet |
+
+---
+
+## 4. Repository Structure
+
+```
+coldnb/
+├── CLAUDE.md                    ← AI routing manifest
+├── PROJECT_CONTEXT.md           ← Tool-agnostic project reference
+├── CODEBASE_ANALYSIS.md         ← This file
+├── memory-bank/                 ← AI session memory (6 files)
+├── docs/                        ← Deep technical documentation
+├── .claude/rules/               ← Path-scoped AI rules (3 files)
+│
+├── coldnb main/coldnb nextjs/   ← FRONTEND (space in name — always quote)
+│   ├── app/
+│   │   ├── (homes)/             ← 18 homepage theme variants
+│   │   ├── (products)/          ← 7+ shop listing layouts
+│   │   ├── (productDetails)/    ← 25+ product detail variants
+│   │   ├── (my-account)/        ← Account, addresses, orders (4 pages)
+│   │   ├── (admin)/admin/       ← Admin dashboard (10+ pages)
+│   │   ├── (other-pages)/       ← Cart, checkout, contact, auth (15+ pages)
+│   │   ├── (blogs)/             ← Blog pages (4 layouts)
+│   │   ├── api/admin/upload/    ← Image upload API route
+│   │   └── layout.js            ← Root layout
+│   ├── components/              ← 33+ component subdirectories
+│   │   ├── admin/               ← AdminSidebar, AdminHeader, dashboard cards
+│   │   ├── headers/             ← 11 header + 11 topbar variants
+│   │   ├── modals/              ← Cart, QuickView, Compare, Wishlist, etc.
+│   │   ├── productCards/        ← 14 product card variants
+│   │   ├── productDetails/      ← Gallery, tabs, related products
+│   │   ├── products/            ← Filters, grid, list views
+│   │   └── common/              ← Shared components
+│   ├── context/                 ← 5 React Contexts
+│   ├── lib/                     ← adminApi.js + i18n system
+│   ├── data/                    ← Static data files (products 133KB, etc.)
+│   ├── public/scss/             ← Bootstrap + 31 SCSS partials
+│   └── utlis/                   ← Utility functions (typo intentional)
+│
+└── coldnb-backend/              ← BACKEND (C)
+    ├── src/
+    │   ├── handlers/            ← ~12 handler files
+    │   ├── services/            ← svc_email, svc_jwt, svc_admin_auth
+    │   ├── clients/             ← client_brevo, client_stripe
+    │   ├── db/                  ← db_connection (pool), db_query
+    │   ├── auth/                ← auth_supabase, auth_middleware
+    │   ├── middleware/          ← rate_limit, analytics
+    │   ├── util/                ← string, json, hash, uuid helpers
+    │   ├── http/                ← http_server, http_router, http_request, http_response
+    │   └── main.c               ← Entry point, route registration
+    ├── include/                 ← Header files (mirrors src/)
+    ├── sql/                     ← 5 migration files (001–005)
+    ├── config/                  ← server.conf + secrets/ directory
+    ├── scripts/                 ← dev_setup.sh, setup_production.sh
+    └── Makefile
+```
+
+```mermaid
+graph LR
+    Layout["app/layout.js"]
+    LangCtx["LanguageContext\npt.json + en.json"]
+    CustomerCtx["CustomerContext\nCart + Wishlist"]
+    AdminCtx["AdminContext\nJWT + Permissions"]
+    AuthCtx["UserAuthContext\nSupabase Session"]
+    AdminAPI["lib/adminApi.js\nAxios + JWT"]
+    StaticData["data/products.js\n133KB static"]
+    Backend["C Backend :8080"]
+    Supabase["Supabase Auth"]
+
+    Layout --> LangCtx
+    Layout --> CustomerCtx
+    Layout --> AdminCtx
+    Layout --> AuthCtx
+    CustomerCtx --> StaticData
+    AdminCtx --> AdminAPI
+    AdminAPI --> Backend
+    AuthCtx --> Supabase
+```
+
+---
+
+## 5. Data Architecture
+
+### Core Entities
+
+**users** — Synced from Supabase Auth (id, supabase_id, email, full_name, phone, avatar_url, is_active, email_verified)
+
+**admin_users** — Independent admin accounts (username, email, password_hash [Argon2id], role, permissions)
+
+**categories** — Hierarchical product categories (id, name, slug, description, parent_id, image_url, sort_order)
+
+**products** — Product catalog (id, name, slug, description, sku, price, compare_at_price, cost_price, category_id, brand, stock_quantity, low_stock_threshold, is_active, is_featured, is_new, is_sale, meta_title, meta_description)
+
+**product_images / product_colors / product_sizes** — Product variants (CASCADE delete on product)
+
+**product_tags + product_tag_assignments** — Many-to-many tag system
+
+**user_addresses** — Shipping addresses (label, recipient_name, street, city, state, postal_code, is_default)
+
+**cart_items** — Server-side cart (user_id, product_id, quantity, color_id, size_id; UNIQUE constraint)
+
+**wishlist_items** — Server-side wishlist (user_id, product_id; UNIQUE constraint)
+
+**discount_codes** — Coupon codes (code, discount_type [percentage/fixed], discount_value, minimum_order, usage_limit, starts_at, expires_at)
+
+**orders** — Orders (order_number, user_id, status, payment_status, payment_method, payment_id; shipping address snapshot; subtotal, shipping_cost, tax_amount, discount_amount, total; paid_at, shipped_at, delivered_at, cancelled_at)
+
+**order_items** — Line items with product snapshot (product_name, product_sku, product_image, color_name, size_name, quantity, unit_price, total_price)
+
+**order_history** — Status change audit trail (order_id, status, notes, created_by admin_id)
+
+**newsletter_subscribers** — Email list (email, name, brevo_id, is_active)
+
+**contact_submissions** — Contact form records (name, email, phone, subject, message, is_read)
+
+**analytics_page_views / analytics_product_views** — Built-in analytics (session_id, user_id, path, product_id)
+
+**admin_sessions** — Admin JWT tracking (token_hash, ip_address, expires_at)
+
+```mermaid
+erDiagram
+    users {
+        uuid id PK
+        uuid supabase_id
+        varchar email
+        varchar full_name
+    }
+    admin_users {
+        uuid id PK
+        varchar username
+        varchar password_hash
+        varchar role
+    }
+    categories {
+        serial id PK
+        varchar name
+        varchar slug
+        int parent_id FK
+    }
+    products {
+        serial id PK
+        varchar name
+        varchar slug
+        decimal price
+        int category_id FK
+        int stock_quantity
+    }
+    product_images {
+        serial id PK
+        int product_id FK
+        varchar url
+        bool is_primary
+    }
+    product_colors {
+        serial id PK
+        int product_id FK
+        varchar name
+        varchar hex_code
+    }
+    product_sizes {
+        serial id PK
+        int product_id FK
+        varchar name
+    }
+    orders {
+        uuid id PK
+        varchar order_number
+        uuid user_id FK
+        varchar status
+        varchar payment_status
+        decimal total
+    }
+    order_items {
+        uuid id PK
+        uuid order_id FK
+        int product_id FK
+        varchar product_name
+        decimal unit_price
+    }
+    order_history {
+        serial id PK
+        uuid order_id FK
+        varchar status
+        uuid created_by FK
+    }
+    cart_items {
+        uuid id PK
+        uuid user_id FK
+        int product_id FK
+        int quantity
+    }
+    wishlist_items {
+        uuid id PK
+        uuid user_id FK
+        int product_id FK
+    }
+    user_addresses {
+        uuid id PK
+        uuid user_id FK
+        varchar city
+        bool is_default
+    }
+    discount_codes {
+        serial id PK
+        varchar code
+        varchar discount_type
+        decimal discount_value
+    }
+
+    users ||--o{ orders : "places"
+    users ||--o{ cart_items : "has"
+    users ||--o{ wishlist_items : "has"
+    users ||--o{ user_addresses : "has"
+    products ||--o{ product_images : "has"
+    products ||--o{ product_colors : "has"
+    products ||--o{ product_sizes : "has"
+    products ||--o{ cart_items : "in"
+    products ||--o{ wishlist_items : "in"
+    products ||--o{ order_items : "referenced by"
+    categories ||--o{ products : "contains"
+    categories ||--o{ categories : "parent of"
+    orders ||--o{ order_items : "contains"
+    orders ||--o{ order_history : "tracked by"
+    admin_users ||--o{ order_history : "creates"
+```
+
+---
+
+## 6. Key System Flows
+
+### Checkout & Payment Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Customer Browser
+    participant FE as Next.js
+    participant BE as C Backend
+    participant DB as PostgreSQL
+    participant S as Stripe
+    participant B as Brevo
+
+    C->>FE: Navigate to /checkout
+    FE->>C: Render checkout form (address, shipping)
+    C->>FE: Submit checkout form
+    FE->>BE: POST /api/orders {items, address, discount_code}
+    BE->>DB: Validate discount_code (if any)
+    BE->>DB: INSERT orders + order_items (product snapshot)
+    BE->>DB: UPDATE discount_codes.used_count
+    BE->>B: Send order confirmation email (customer)
+    BE->>B: Send new order alert (internal)
+    BE-->>FE: {order_id, order_number, total}
+    Note over BE,S: ⚠️ Stripe payment initiation INCOMPLETE
+    FE->>C: Show order confirmation page
+```
+
+### Order Fulfillment & Notification Flow
+
+```mermaid
+sequenceDiagram
+    participant A as Admin
+    participant FE as Next.js Admin
+    participant BE as C Backend
+    participant DB as PostgreSQL
+    participant B as Brevo
+
+    A->>FE: Open order, click "Update Status"
+    FE->>BE: PUT /api/admin/orders/:id/status {status, notes}
+    BE->>DB: UPDATE orders SET status = ?
+    BE->>DB: INSERT order_history (status, notes, admin_id)
+    BE->>DB: SELECT customer email from users JOIN orders
+    BE->>B: Send status update email (customer)
+    BE-->>FE: {success: true}
+    FE->>A: Show success notification
+```
+
+### User Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant FE as Next.js
+    participant SB as Supabase Auth
+    participant BE as C Backend
+
+    C->>FE: Navigate to /login, enter credentials
+    FE->>SB: supabase.auth.signInWithPassword({email, password})
+    SB-->>FE: {session: {access_token, refresh_token}, user}
+    FE->>FE: Store session in UserAuthContext
+    Note over FE: access_token is a signed Supabase JWT
+
+    C->>FE: Add to cart (authenticated)
+    FE->>BE: POST /api/cart {product_id, qty}\n Authorization: Bearer <supabase_jwt>
+    BE->>BE: auth_supabase_validate_jwt(token)
+    BE->>BE: Extract user claims → req->user_id
+    BE->>DB: INSERT cart_items WHERE user_id = req->user_id
+    BE-->>FE: {success: true}
+```
+
+---
+
+## 7. External Integrations
+
+| Service | Purpose | Status | Notes |
+|---------|---------|--------|-------|
+| Supabase Auth | Customer identity, session management | ✅ Live | JWT validated in `auth_supabase.c`; email verified via Brevo SMTP relay |
+| Brevo API v3 | Transactional emails (order, contact) | ✅ Live | `xkeysib-...` key; contact + order flows verified on VPS |
+| Brevo SMTP | Auth email relay (signup, reset, magic link) | ✅ Configured | `xsmtpsib-...` via Supabase dashboard; conceptually separate from Brevo API |
+| Stripe | Payment processing | 🔄 Partial | `client_stripe.c` exists; not configured on VPS; checkout UI exists |
+| EmailJS | Contact form (legacy template integration) | ⚠️ Unconfigured | Still in Contact1/2/3.jsx; should be replaced by backend `/api/contact` |
+| Google Maps | Store location embeds | ⚠️ Placeholder | Shows New York coordinates; needs real store location |
+
+---
+
+## 8. Current Implementation Status — Full Feature Audit
+
+### Catalog & Discovery
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Product listing pages | 🔄 Partial | UI complete (7+ layouts); uses static data file — not connected to DB |
+| Product detail pages | 🔄 Partial | UI complete (25+ variants); variant selection (color/size) works on static data |
+| Category management | ✅ Done | Schema + backend handlers + admin UI |
+| Search functionality | ⬜ Not Started | No search; client-side filter on static data only |
+| Product recommendations | ⬜ Not Started | No related products logic |
+| Inventory status display | 🔄 Partial | `stock_quantity` in DB; not surfaced to customer UI |
+
+### Cart & Checkout
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Add to cart, update quantity, remove | ✅ Done | localStorage cart fully functional in UI |
+| Server-side cart (authenticated) | ✅ Done | DB table + backend handlers; not synced with localStorage |
+| Cart merge on login | ⬜ Not Started | localStorage cart and server cart are separate; no merge |
+| Guest checkout | ⬜ Not Started | Schema supports NULL user_id on orders; UI flow not built |
+| Shipping address input & validation | ✅ Done | Checkout UI + user_addresses DB table |
+| Saved address management | ✅ Done | `/my-account-address` page + backend handlers |
+| Shipping method selection | 🔄 Partial | Schema exists (shipping_zones SQL); UI exists; no real rate calculation |
+| Coupon/promo code application | 🔄 Partial | DB schema + backend validation; frontend checkout UI connection unknown |
+| Order summary review | ✅ Done | Checkout UI shows cart items, subtotal, shipping |
+| Multi-step checkout flow | ✅ Done | Checkout page with address → payment steps |
+
+### Payments
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Stripe integration | 🔄 Partial | `client_stripe.c` exists; not configured on VPS |
+| Credit/debit card processing | 🔄 Partial | Stripe UI elements not yet integrated in checkout |
+| PIX / Boleto (Brazilian market) | ⬜ Not Started | Stripe supports PIX; not implemented |
+| Apple Pay / Google Pay | ⬜ Not Started | |
+| Payment failure handling | ⬜ Not Started | No retry flow |
+| Refunds | ⬜ Not Started | No refund workflow |
+| Fraud detection | ⬜ Not Started | |
+
+### Order Management
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Order creation + unique order number | ✅ Done | `POST /api/orders`; order_number generated by backend |
+| Order status lifecycle | ✅ Done | pending → confirmed → processing → shipped → delivered → cancelled |
+| Order history (customer) | ✅ Done | `/my-account-orders` + `/my-account-orders-details` |
+| Admin order dashboard | ✅ Done | List, filter, view orders in admin |
+| Admin order status updates | ✅ Done | `PUT /api/admin/orders/:id/status` + email notification |
+| Order tracking page | 🔄 Partial | `/order-tracking` UI exists; not connected to backend |
+| Order cancellation | 🔄 Partial | Status flow supports cancelled; no customer-initiated cancel UI |
+| Order editing | ⬜ Not Started | |
+
+### Post-Sale & Fulfillment
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Order confirmation email | ✅ Done | Sent on `POST /api/orders` via Brevo API |
+| Internal new-order alert | ✅ Done | Sent to `email@coldnb.com` on order creation |
+| Order status update email | ✅ Done | Sent to customer when admin updates status |
+| Shipping confirmation + tracking | ⬜ Not Started | No tracking number field or carrier integration |
+| Return/exchange workflow | ⬜ Not Started | |
+| Refund notification | ⬜ Not Started | |
+| Invoice/receipt PDF | ⬜ Not Started | |
+
+### Customer Accounts
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Registration + login (email/password) | ✅ Done | Supabase Auth; `/login`, `/register` pages |
+| OAuth / social login | ⬜ Not Started | Supabase supports it; not wired in frontend |
+| Password reset | 🔄 Partial | `/forget-password` page exists; Supabase flow; needs verification |
+| Profile management | ✅ Done | `/my-account` page |
+| Saved addresses | ✅ Done | `/my-account-address` + backend CRUD |
+| Order history | ✅ Done | `/my-account-orders` |
+| Wishlist | ✅ Done | UI complete (localStorage); server-side exists |
+| Account deletion / GDPR | ⬜ Not Started | |
+
+### Email & Notifications
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Transactional email infrastructure | ✅ Done | Brevo API v3 via `client_brevo.c` + `svc_email.c` |
+| Order confirmation template | ✅ Done | Sent via Brevo; minimal HTML template |
+| Status update template | ✅ Done | Sent via Brevo |
+| Contact notification template | ✅ Done | Sent to internal inbox |
+| Password reset / welcome email | ✅ Done | Via Supabase → Brevo SMTP |
+| Rich HTML email templates | ⬜ Not Started | Current templates are plain/minimal |
+| Email preference management / unsubscribe | ⬜ Not Started | |
+| SMS / WhatsApp notifications | ⬜ Not Started | |
+
+### Admin & Operations Panel
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Admin login | ✅ Done | `POST /api/admin/login`; Argon2id; custom JWT |
+| Product CRUD | 🔄 Partial | Schema + handlers exist; admin UI completeness unknown |
+| Image upload | ✅ Done | `POST /api/admin/upload` → `public/uploads/products/` |
+| Order management dashboard | ✅ Done | List, filter, status updates |
+| Customer management | 🔄 Partial | Page exists in admin sidebar; handler extent unknown |
+| Coupon management | 🔄 Partial | Schema complete; admin CRUD UI extent unknown |
+| Analytics dashboard | ✅ Done | Revenue, orders, top products charts (Chart.js) |
+| Email operations page | ✅ Done | `/admin/email` — architecture reference, config display |
+| Inventory management (low stock) | ⬜ Not Started | `low_stock_threshold` in schema; no alerts or bulk update UI |
+| Content management (homepage) | 🔄 Partial | `003_homepage_content.sql` exists; admin UI unknown |
+| Reporting exports | ⬜ Not Started | |
+
+### Shipping & Logistics
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Shipping zones schema | ✅ Done | `004_shipping_zones.sql` applied |
+| Shipping rate calculation | 🔄 Partial | `shipping_cost` field in orders; no real-time rate lookup |
+| Carrier integration (Correios) | ⬜ Not Started | |
+| Tracking number + tracking page | ⬜ Not Started | |
+| Shipping label generation | ⬜ Not Started | |
+| Free shipping threshold | 🔄 Partial | DB supports it; no UI enforcement logic |
+
+### SEO & Marketing
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| SEO-friendly slugs | ✅ Done | All products and categories have slug fields |
+| Meta tags / Open Graph | ⬜ Not Started | No meta tags on product pages |
+| Sitemap generation | ⬜ Not Started | |
+| Newsletter signup | 🔄 Partial | Frontend modal/footer logs to console; backend endpoint exists; not wired |
+| Abandoned cart recovery | ⬜ Not Started | |
+| Loyalty/rewards program | ⬜ Not Started | |
+
+### Performance & Infrastructure
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Image optimization | 🔄 Partial | Next.js Image component available; not used everywhere |
+| CDN | ⬜ Not Started | Assets served directly from VPS |
+| Caching (Redis/edge) | ⬜ Not Started | No caching layer |
+| Mobile responsiveness | ✅ Done | Bootstrap responsive grid; mobile-first |
+| Accessibility (WCAG) | 🔄 Partial | Bootstrap a11y defaults; not audited |
+
+### Security & Compliance
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| HTTPS enforcement | ✅ Done | Nginx + Let's Encrypt |
+| Backend loopback binding | ✅ Done | 127.0.0.1:8080 in production |
+| Secrets management | ✅ Done | Secret files only; not committed to git |
+| Admin password hashing | ✅ Done | Argon2id via libsodium |
+| Rate limiting | ✅ Done | Backend middleware active |
+| Threat blocking | ✅ Done | CrowdSec + fail2ban + UFW |
+| Input validation | 🔄 Partial | Present in handlers; coverage not audited |
+| LGPD / GDPR compliance | ⬜ Not Started | No cookie consent, no data export, no deletion flow |
+| Dependency vulnerability scanning | ⬜ Not Started | No automated scanning |
+
+---
+
+## 9. Product Gaps & Recommendations
+
+### P0 — Blockers (Cannot launch without these)
+
+**P0.1 — Stripe Payment Integration**
+- **Missing:** Stripe is not configured on VPS. `client_stripe.c` exists but payment intent creation, confirmation, and webhook handling are incomplete. Customers cannot pay.
+- **Why it matters:** Zero revenue without payments.
+- **Suggestion:** Implement `POST /api/stripe/create-payment-intent`, integrate Stripe Elements in checkout frontend, add `POST /api/stripe/webhook` handler for `payment_intent.succeeded` → update order payment_status and status.
+
+**P0.2 — Frontend Product Data from Database**
+- **Missing:** `data/products.js` (133KB static file) drives all customer-facing product browsing. Prices, stock levels, and availability displayed are not from the live database.
+- **Why it matters:** Store cannot launch with hardcoded, stale product data. Inventory management is impossible.
+- **Suggestion:** Replace static data lookups in product listing/detail pages with API calls to `GET /api/products` and `GET /api/products/:id`. Use Next.js dynamic data fetching patterns.
+
+**P0.3 — Cart Merge on Login**
+- **Missing:** No reconciliation between localStorage cart (guest) and server-side cart (authenticated user). Items added before login are lost.
+- **Why it matters:** Poor UX destroys conversion — users add items then lose them when they log in.
+- **Suggestion:** On Supabase auth state change (login), read localStorage cart and POST each item to `/api/cart`, then clear localStorage and switch to server-side cart.
+
+### P1 — High Priority (Significant UX or business impact)
+
+**P1.1 — PIX Payment Method (Brazilian Market)**
+- **Missing:** No PIX integration. PIX is the dominant payment method in Brazil.
+- **Suggestion:** Stripe supports PIX. Add alongside credit card in checkout.
+
+**P1.2 — Real Shipping Rate Calculation**
+- **Missing:** Shipping cost is hardcoded or zero. No Correios/carrier integration.
+- **Suggestion:** Integrate Correios web service or a shipping aggregator for real-time rate lookup.
+
+**P1.3 — Newsletter Wiring**
+- **Missing:** Footer and modal newsletter signup logs to console only. Backend `/api/newsletter` endpoint exists and connects to Brevo.
+- **Suggestion:** Replace console.log with `POST /api/newsletter` call from `Footer1.jsx` and `NewsLetterModal.jsx`.
+
+**P1.4 — Contact Form Backend Wiring**
+- **Missing:** `Contact1/2/3.jsx` use EmailJS (unconfigured). Backend `/api/contact` is live and sends real notifications.
+- **Suggestion:** Replace EmailJS calls with `POST /api/contact` via `adminApi` (or plain fetch).
+
+**P1.5 — SEO Meta Tags**
+- **Missing:** No meta titles, descriptions, or Open Graph tags on product pages.
+- **Suggestion:** Use Next.js `generateMetadata()` on product and category pages.
+
+**P1.6 — LGPD Cookie Consent**
+- **Missing:** No cookie consent banner. Required for Brazilian LGPD compliance.
+- **Suggestion:** Add cookie consent component; defer analytics scripts until consent given.
+
+### P2 — Medium Priority (Important, not launch-blocking)
+
+**P2.1 — Order Tracking Page**
+- Backend has order status; `/order-tracking` page exists as UI only. Wire to `GET /api/orders/:order_number`.
+
+**P2.2 — Guest Checkout**
+- Schema supports `user_id NULL` on orders. Build the guest → order flow (no auth required for purchase).
+
+**P2.3 — Inventory Management UI**
+- `low_stock_threshold` in schema. Add low-stock alert dashboard widget and bulk stock update in admin.
+
+**P2.4 — Rich Email Templates**
+- Current Brevo emails are plain/minimal. Build branded HTML templates for order confirmation and status updates.
+
+**P2.5 — Social Login (OAuth)**
+- Supabase supports Google/GitHub OAuth. Add buttons to `/login` and `/register`.
+
+**P2.6 — Sitemap Generation**
+- Add `app/sitemap.js` using Next.js built-in sitemap support with product slugs from API.
+
+### P3 — Nice to Have
+
+- Product full-text search (PostgreSQL `tsvector` or Meilisearch)
+- Abandoned cart recovery emails
+- Product recommendations (related items, frequently bought together)
+- Invoice/receipt PDF generation (via Puppeteer or WeasyPrint)
+- Image CDN (Cloudflare Images or AWS S3 + CloudFront)
+- Loyalty/rewards program
+- Shipping label generation
+
+---
+
+## 10. Technical Debt & Refactor Priorities
+
+| Item | Location | Problem | Risk | Recommended Fix |
+|------|---------|---------|------|----------------|
+| Static product data | `data/products.js` | 133KB client bundle; disconnected from real inventory | Critical | Migrate product pages to API-driven data fetching |
+| Dual cart systems | `context/Context.jsx` + backend | No merge on login; split UX | High | Implement cart reconciliation on auth state change |
+| Dead homepage themes | `app/(homes)/` | 17 unused themes inflate bundle and maintenance burden | Medium | Delete all but the production homepage; keep only active theme |
+| Dead product detail variants | `app/(productDetails)/` | 24 unused variants inflate bundle | Medium | Audit which is in production use; delete rest |
+| EmailJS in contact forms | `components/otherPages/Contact*.jsx` | Unconfigured; backend endpoint exists | Medium | Replace with `POST /api/contact` |
+| Placeholder data | `Footer1.jsx`, store location pages | "themesflat@gmail.com", New York coordinates | Medium | Replace with real contact info and store location |
+| `reducer/` directory | `coldnb main/coldnb nextjs/reducer/` | Empty; no reducers; dead directory | Low | Delete |
+| `utlis/` typo | `coldnb main/coldnb nextjs/utlis/` | Typo; all imports reference it; cannot rename without mass refactor | Low | Document; do not rename |
+
+---
+
+## 11. Security & Compliance Assessment
+
+| Area | Status | Findings |
+|------|--------|---------|
+| HTTPS / TLS | ✅ Secure | Let's Encrypt via Nginx; redirects HTTP → HTTPS |
+| Backend exposure | ✅ Secure | Loopback binding (`127.0.0.1:8080`); not reachable from internet |
+| Secrets management | ✅ Secure | All credentials in `config/secrets/` files; not in git |
+| Admin password hashing | ✅ Secure | Argon2id via libsodium (gold standard) |
+| JWT security | ✅ Secure | Separate secrets for customer vs admin JWTs |
+| Rate limiting | ✅ Active | Backend middleware on all endpoints |
+| Network security | ✅ Active | UFW (port 22/80/443 only) + CrowdSec + fail2ban |
+| Input sanitization | 🔄 Partial | Parameterized DB queries protect against SQL injection; XSS protection through React's default escaping on frontend; server-side input validation coverage not audited |
+| CORS | ✅ Configured | Whitelist in server.conf (not wildcard) |
+| Use-after-free (JSON) | ✅ Fixed | Bug in 3 handlers fixed; copy strings before `cJSON_Delete()` |
+| `is_valid_path()` bug | ✅ Fixed | Broken `memchr` null-byte check removed |
+| LGPD / GDPR | ⬜ Not Started | No cookie consent banner; no data export; no deletion workflow |
+| Dependency scanning | ⬜ Not Started | No automated `npm audit` or C dependency auditing in CI |
+| SQL injection | ✅ Protected | Parameterized queries via libpq (`$1, $2, ...`) |
+| Stripe not configured | ⚠️ Warning | VPS logs Stripe warning at startup; not a security issue but a completeness gap |
+
+**Critical Remediation Items:**
+1. Implement LGPD cookie consent before any real user data collection
+2. Add automated `npm audit` check in deploy pipeline
+3. Audit all backend handlers for input length validation and edge cases
+
+---
+
+## 12. Development Roadmap
+
+```mermaid
+gantt
+    title Coldnb E-commerce Platform Roadmap
+    dateFormat  YYYY-MM-DD
+
+    section Phase 1 — Production Readiness
+    Stripe payment flow (intent, confirm, webhook)   :p1a, 2026-03-11, 14d
+    Frontend product API connection                  :p1b, 2026-03-11, 10d
+    Cart merge on login                              :p1c, after p1b, 5d
+    Newsletter wiring                                :p1d, 2026-03-15, 3d
+    Contact form backend wiring                      :p1e, 2026-03-15, 2d
+    PIX payment method                               :p1f, after p1a, 7d
+    LGPD cookie consent                              :p1g, 2026-03-18, 5d
+
+    section Phase 2 — Growth Features
+    Order tracking page                              :p2a, after p1c, 5d
+    Rich email templates (HTML)                      :p2b, after p1e, 7d
+    Guest checkout flow                              :p2c, after p1a, 10d
+    Shipping rate calculation (Correios)             :p2d, 2026-04-01, 14d
+    SEO meta tags + sitemap                          :p2e, 2026-04-01, 5d
+    Inventory management UI                          :p2f, 2026-04-05, 7d
+    Social login (OAuth)                             :p2g, 2026-04-10, 5d
+
+    section Phase 3 — Scale & Optimize
+    Product full-text search                         :p3a, 2026-04-20, 10d
+    Image CDN (Cloudflare / S3)                      :p3b, 2026-04-20, 7d
+    Abandoned cart recovery                          :p3c, 2026-04-25, 7d
+    Product recommendations                          :p3d, 2026-05-01, 10d
+    Invoice PDF generation                           :p3e, 2026-05-05, 7d
+    Loyalty/rewards program                          :p3f, 2026-05-15, 14d
+    Dead code cleanup (unused themes/variants)       :p3g, 2026-05-01, 5d
+```
+
+---
+
+## 13. Appendix: Key File Reference
+
+| Concept | File(s) |
+|---------|---------|
+| Root layout (contexts, modals, Bootstrap) | `coldnb main/coldnb nextjs/app/layout.js` |
+| Customer context (cart, wishlist, compare) | `coldnb main/coldnb nextjs/context/Context.jsx` |
+| Admin context (JWT, permissions) | `coldnb main/coldnb nextjs/context/AdminContext.jsx` |
+| User auth context (Supabase session) | `coldnb main/coldnb nextjs/context/UserAuthContext.jsx` |
+| i18n context + translations | `coldnb main/coldnb nextjs/lib/i18n/LanguageContext.jsx` |
+| Translation files | `coldnb main/coldnb nextjs/lib/i18n/translations/pt.json` + `en.json` |
+| Admin Axios instance (JWT interceptor) | `coldnb main/coldnb nextjs/lib/adminApi.js` |
+| Static product data (133KB) | `coldnb main/coldnb nextjs/data/products.js` |
+| Image upload API route | `coldnb main/coldnb nextjs/app/api/admin/upload/route.js` |
+| Admin sidebar navigation | `coldnb main/coldnb nextjs/components/admin/layout/AdminSidebar.jsx` |
+| Admin email page | `coldnb main/coldnb nextjs/app/(admin)/admin/email/page.jsx` |
+| Cart modal | `coldnb main/coldnb nextjs/components/modals/CartModal.jsx` |
+| Cart utility trigger | `coldnb main/coldnb nextjs/utlis/openCartModal.js` |
+| Backend entry + route registration | `coldnb-backend/src/main.c` |
+| HTTP server | `coldnb-backend/src/http/http_server.c` |
+| Product handler | `coldnb-backend/src/handlers/handler_products.c` |
+| Order handler | `coldnb-backend/src/handlers/handler_orders.c` |
+| Admin order handler | `coldnb-backend/src/handlers/handler_admin_orders.c` |
+| Contact handler | `coldnb-backend/src/handlers/handler_contact.c` |
+| Admin auth handler | `coldnb-backend/src/handlers/handler_admin.c` |
+| Admin analytics handler | `coldnb-backend/src/handlers/handler_admin_analytics.c` |
+| Email service (abstraction) | `coldnb-backend/src/services/svc_email.c` |
+| Brevo API client | `coldnb-backend/src/clients/client_brevo.c` |
+| Stripe client | `coldnb-backend/src/clients/client_stripe.c` |
+| Supabase JWT validation | `coldnb-backend/src/auth/auth_supabase.c` |
+| DB connection pool | `coldnb-backend/src/db/db_connection.c` |
+| Rate limiting middleware | `coldnb-backend/src/middleware/middleware_rate_limit.c` |
+| Initial database schema | `coldnb-backend/sql/001_initial_schema.sql` |
+| Admin permissions schema | `coldnb-backend/sql/002_admin_permissions.sql` |
+| Backend configuration | `coldnb-backend/config/server.conf` |
+| Deploy script | `coldnb/scripts/deploy.sh` |
+| DB sync script | `coldnb/scripts/db-sync.sh` |
+| Admin password generator | `coldnb-backend/src/scripts/generate_admin_password.c` |
+| Supabase SMTP setup guide | `coldnb-backend/docs/SUPABASE_BREVO_SMTP_SETUP.md` |

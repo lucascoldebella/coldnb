@@ -1,5 +1,6 @@
 #include "handlers/handler_contact.h"
 #include "db/db_query.h"
+#include "services/svc_email.h"
 #include "util/json_util.h"
 #include "util/string_util.h"
 #include "log/log.h"
@@ -111,6 +112,13 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     const char *params[] = { name, email, phone, subject, message };
     PGresult *result = db_exec_params(conn, insert_query, 5, params);
 
+    /* Save copies before freeing the JSON tree */
+    char *name_copy = str_dup(name);
+    char *email_copy = str_dup(email);
+    char *phone_copy = phone ? str_dup(phone) : NULL;
+    char *subject_copy = subject ? str_dup(subject) : NULL;
+    char *message_copy = str_dup(message);
+
     /* Save sanitized copies for logging before freeing the JSON tree */
     char *safe_name = str_sanitize_log(name);
     char *safe_email = str_sanitize_log(email);
@@ -120,13 +128,18 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     if (!db_result_ok(result) || !db_result_has_rows(result)) {
         PQclear(result);
         db_pool_release(pool, conn);
+        free(name_copy);
+        free(email_copy);
+        free(phone_copy);
+        free(subject_copy);
+        free(message_copy);
         free(safe_name);
         free(safe_email);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to submit contact form");
         return;
     }
 
-    const char *submission_id = db_result_value(result);
+    char *submission_id = str_dup(db_result_value(result));
     PQclear(result);
     db_pool_release(pool, conn);
 
@@ -141,8 +154,27 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     http_response_json(resp, HTTP_STATUS_CREATED, json);
     free(json);
 
+    EmailContactSubmission submission = {
+        .submission_id = submission_id,
+        .name = name_copy,
+        .email = email_copy,
+        .phone = phone_copy,
+        .subject = subject_copy,
+        .message = message_copy
+    };
+    if (email_service_send_contact_notification(&submission) != 0) {
+        LOG_WARN("Contact submission email notification failed for %s",
+                 safe_email ? safe_email : "?");
+    }
+
     LOG_INFO("Contact form submission from: %s <%s>",
              safe_name ? safe_name : "?", safe_email ? safe_email : "?");
+    free(submission_id);
+    free(name_copy);
+    free(email_copy);
+    free(phone_copy);
+    free(subject_copy);
+    free(message_copy);
     free(safe_name);
     free(safe_email);
 }

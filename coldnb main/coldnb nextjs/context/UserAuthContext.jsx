@@ -2,7 +2,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import supabase from "@/lib/supabase";
-import { profileApi } from "@/lib/userApi";
+import { profileApi, cartApi } from "@/lib/userApi";
+import { sanitizeNextPath } from "@/lib/authRedirect";
+import { useContextElement } from "./Context";
 
 const UserAuthContext = createContext();
 
@@ -20,11 +22,22 @@ export function UserAuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const isSigningOut = useRef(false);
+  const { setCartProducts } = useContextElement();
   const router = useRouter();
   const pathname = usePathname();
 
   const isAuthenticated = !!session;
   const isProfileComplete = !!(profile?.full_name && profile?.phone);
+
+  const getAuthRedirectUrl = useCallback((nextPath = "/my-account", flow = "") => {
+    if (typeof window === "undefined") return undefined;
+    const redirectUrl = new URL("/auth/callback", window.location.origin);
+    redirectUrl.searchParams.set("next", sanitizeNextPath(nextPath));
+    if (flow) {
+      redirectUrl.searchParams.set("flow", flow);
+    }
+    return redirectUrl.toString();
+  }, []);
 
   // Fetch user profile from backend (auto-creates if not found)
   const fetchProfile = useCallback(async () => {
@@ -39,6 +52,42 @@ export function UserAuthProvider({ children }) {
     }
   }, []);
 
+  // Merge localStorage cart into server cart, then load server cart into Context
+  const mergeCartOnLogin = useCallback(async () => {
+    try {
+      // Push localStorage items to server
+      const localCart = JSON.parse(localStorage.getItem("cartList") || "[]");
+      if (localCart.length > 0) {
+        await Promise.all(
+          localCart.map((item) =>
+            cartApi.add(item.id, item.quantity || 1).catch(() => null)
+          )
+        );
+      }
+
+      // Fetch merged server cart
+      const res = await cartApi.get();
+      const serverItems = res.data?.data?.items || [];
+
+      // Transform server items to frontend shape
+      const merged = serverItems.map((item) => ({
+        id: item.product_id,
+        title: item.product_name,
+        price: parseFloat(item.price) || 0,
+        imgSrc: item.image_url || "/images/products/placeholder.jpg",
+        quantity: item.quantity || 1,
+        slug: item.product_slug,
+        compareAtPrice: item.compare_at_price ? parseFloat(item.compare_at_price) : null,
+        color: item.color_name || null,
+        size: item.size_name || null,
+      }));
+
+      setCartProducts(merged);
+    } catch (error) {
+      console.error("Cart merge failed:", error);
+    }
+  }, [setCartProducts]);
+
   // Update user profile
   const updateProfile = useCallback(async (data) => {
     const response = await profileApi.update(data);
@@ -48,9 +97,13 @@ export function UserAuthProvider({ children }) {
   }, []);
 
   // Sign up with email
-  const signUp = useCallback(async (email, password) => {
+  const signUp = useCallback(async (email, password, options = {}) => {
     if (!supabase) return { error: { message: "Auth not configured" } };
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options,
+    });
     return { data, error };
   }, []);
 
@@ -62,16 +115,17 @@ export function UserAuthProvider({ children }) {
   }, []);
 
   // Sign in with OAuth
-  const signInWithOAuth = useCallback(async (provider) => {
+  const signInWithOAuth = useCallback(async (provider, nextPath = "/complete-profile") => {
     if (!supabase) return { error: { message: "Auth not configured" } };
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/my-account`,
+        redirectTo: getAuthRedirectUrl(nextPath, "oauth"),
+        queryParams: provider === "google" ? { prompt: "select_account" } : undefined,
       },
     });
     return { data, error };
-  }, []);
+  }, [getAuthRedirectUrl]);
 
   // Sign out
   const signOut = useCallback(async () => {
@@ -101,10 +155,25 @@ export function UserAuthProvider({ children }) {
   const resetPassword = useCallback(async (email) => {
     if (!supabase) return { error: { message: "Auth not configured" } };
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/my-account`,
+      redirectTo: getAuthRedirectUrl("/my-account", "recovery"),
     });
     return { data, error };
-  }, []);
+  }, [getAuthRedirectUrl]);
+
+  const deleteAccount = useCallback(async () => {
+    await profileApi.deleteAccount();
+
+    try {
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
+    } finally {
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      router.push("/login");
+    }
+  }, [router]);
 
   // Listen to auth state changes
   useEffect(() => {
@@ -131,6 +200,7 @@ export function UserAuthProvider({ children }) {
 
         if (event === "SIGNED_IN" && newSession) {
           await fetchProfile();
+          await mergeCartOnLogin();
         }
 
         if (event === "SIGNED_OUT") {
@@ -140,7 +210,7 @@ export function UserAuthProvider({ children }) {
     );
 
     return () => subscription.unsubscribe();
-  }, [fetchProfile]);
+  }, [fetchProfile, mergeCartOnLogin]);
 
   const value = {
     user,
@@ -156,6 +226,8 @@ export function UserAuthProvider({ children }) {
     updateProfile,
     fetchProfile,
     resetPassword,
+    deleteAccount,
+    getAuthRedirectUrl,
   };
 
   return (

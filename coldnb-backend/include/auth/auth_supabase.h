@@ -8,6 +8,7 @@ typedef struct {
     char *user_id;          /* Supabase user ID (UUID) */
     char *email;
     char *phone;
+    char *full_name;
     bool email_verified;
     bool phone_verified;
     char *role;             /* User role from JWT */
@@ -19,6 +20,7 @@ typedef struct {
     const char *project_url;    /* e.g., https://xxx.supabase.co */
     const char *jwt_secret;     /* JWT signing secret */
     const char *anon_key;       /* Supabase anon key (for API calls) */
+    const char *service_role_key; /* Supabase service role key (admin operations) */
 } SupabaseConfig;
 
 /* Initialize Supabase authentication
@@ -54,5 +56,9 @@ char *supabase_signup(const char *email, const char *password);
 /* Refresh an access token
  * Returns new access token (caller must free) or NULL on failure */
 char *supabase_refresh_token(const char *refresh_token);
+
+/* Delete a Supabase auth user through the admin API.
+ * Returns 0 on success, -1 on request failure, -2 if admin API is not configured. */
+int supabase_delete_user_admin(const char *user_id);
 
 #endif /* COLDNB_AUTH_SUPABASE_H */

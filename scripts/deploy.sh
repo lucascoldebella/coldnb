@@ -12,7 +12,7 @@
 set -e
 
 VPS="coldnb-vps"
-VPS_PUBLIC_IP="${VPS_PUBLIC_IP:-64.225.9.178}"
+VPS_PUBLIC_IP="${VPS_PUBLIC_IP:-134.209.44.188}"
 VPS_PROJECT="/opt/coldnb"
 VPS_FRONTEND="$VPS_PROJECT/coldnb main/coldnb nextjs"
 VPS_BACKEND="$VPS_PROJECT/coldnb-backend"
@@ -52,19 +52,23 @@ echo "  Coldnb Deploy to Production"
 echo "========================================"
 echo ""
 
-# Step 1: Check for uncommitted changes
+# Step 1: Commit local changes if any
 info "Checking local git status..."
 cd "$(dirname "$0")/.."
 
 if [ -n "$(git status --porcelain)" ]; then
-    warn "You have uncommitted changes:"
+    warn "Uncommitted changes:"
     git status --short
     echo ""
-    read -p "Continue deploying only committed changes? (y/N) " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        fail "Aborted. Commit your changes first."
+    read -p "Commit message: " COMMIT_MSG
+    if [ -z "$COMMIT_MSG" ]; then
+        fail "Aborted. No commit message entered."
     fi
+    git add -A
+    git commit -m "$COMMIT_MSG"
+    ok "Changes committed"
+else
+    info "Working tree clean — pushing latest commit"
 fi
 
 # Step 2: Detect what changed since last deploy tag
@@ -151,8 +155,8 @@ git tag "$DEPLOY_TAG" 2>/dev/null || true
 # Step 9: Quick health check
 info "Health check..."
 sleep 3
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://$VPS_PUBLIC_IP/" 2>/dev/null || echo "000")
-API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://$VPS_PUBLIC_IP/api/products" 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://coldnb.com/" 2>/dev/null || echo "000")
+API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://coldnb.com/api/products" 2>/dev/null || echo "000")
 
 if [ "$HTTP_CODE" = "200" ] && [ "$API_CODE" = "200" ]; then
     ok "Health check passed: Frontend=$HTTP_CODE API=$API_CODE"

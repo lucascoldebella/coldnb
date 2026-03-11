@@ -13,6 +13,7 @@
 static struct {
     char *api_key;
     int list_id;
+    bool sandbox_mode;
     bool initialized;
 } brevo_state = {0};
 
@@ -53,9 +54,12 @@ int brevo_init(const BrevoConfig *config) {
     }
 
     brevo_state.list_id = config->list_id > 0 ? config->list_id : 1;
+    brevo_state.sandbox_mode = config->sandbox_mode;
     brevo_state.initialized = true;
 
-    LOG_INFO("Brevo client initialized (list_id: %d)", brevo_state.list_id);
+    LOG_INFO("Brevo client initialized (list_id: %d, sandbox: %s)",
+             brevo_state.list_id,
+             brevo_state.sandbox_mode ? "enabled" : "disabled");
     return 0;
 }
 
@@ -99,6 +103,13 @@ static char *brevo_api_request(const char *method, const char *endpoint,
     curl_easy_setopt(curl, CURLOPT_URL, url);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, brevo_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "https");
+    curl_easy_setopt(curl, CURLOPT_REDIR_PROTOCOLS_STR, "https");
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "coldnb-server/1.0");
 
     /* Set headers */
     struct curl_slist *headers = NULL;
@@ -148,6 +159,16 @@ static char *brevo_api_request(const char *method, const char *endpoint,
     return response.data;
 }
 
+static void brevo_log_http_error(const char *operation, long http_code, const char *response) {
+    char *safe_response = str_sanitize_log(response);
+    LOG_ERROR("Brevo %s failed (HTTP %ld)%s%s",
+              operation ? operation : "request",
+              http_code,
+              safe_response ? ": " : "",
+              safe_response ? safe_response : "");
+    free(safe_response);
+}
+
 int brevo_add_contact(const char *email, const char *name) {
     if (!brevo_state.initialized) {
         return -1;
@@ -183,15 +204,16 @@ int brevo_add_contact(const char *email, const char *name) {
     long http_code = 0;
     char *response = brevo_api_request("POST", "/contacts", body_str, &http_code);
     free(body_str);
-    free(response);
 
     /* 201 = created, 204 = updated */
     if (http_code == 201 || http_code == 204) {
         LOG_INFO("Contact added to Brevo: %s", email);
+        free(response);
         return 0;
     }
 
-    LOG_ERROR("Failed to add contact to Brevo: %s (HTTP %ld)", email, http_code);
+    brevo_log_http_error("add contact", http_code, response);
+    free(response);
     return -1;
 }
 
@@ -235,14 +257,15 @@ int brevo_remove_contact(const char *email) {
     char *response = brevo_api_request("POST", endpoint, body_str, &http_code);
     free(endpoint);
     free(body_str);
-    free(response);
 
     if (http_code == 201 || http_code == 204 || http_code == 200) {
         LOG_INFO("Contact removed from Brevo list: %s", email);
+        free(response);
         return 0;
     }
 
-    LOG_ERROR("Failed to remove contact from Brevo: %s (HTTP %ld)", email, http_code);
+    brevo_log_http_error("remove contact", http_code, response);
+    free(response);
     return -1;
 }
 
@@ -286,14 +309,15 @@ int brevo_update_contact(const char *email, const char *name) {
     char *response = brevo_api_request("PUT", endpoint, body_str, &http_code);
     free(endpoint);
     free(body_str);
-    free(response);
 
     if (http_code == 204 || http_code == 200) {
         LOG_INFO("Contact updated in Brevo: %s", email);
+        free(response);
         return 0;
     }
 
-    LOG_ERROR("Failed to update contact in Brevo: %s (HTTP %ld)", email, http_code);
+    brevo_log_http_error("update contact", http_code, response);
+    free(response);
     return -1;
 }
 
@@ -324,4 +348,129 @@ bool brevo_contact_exists(const char *email) {
     free(response);
 
     return http_code == 200;
+}
+
+int brevo_send_email(const BrevoEmailRequest *request, char **message_id_out) {
+    if (message_id_out != NULL) {
+        *message_id_out = NULL;
+    }
+
+    if (!brevo_state.initialized || request == NULL) {
+        return -1;
+    }
+
+    if (str_is_empty(request->sender_email) ||
+        str_is_empty(request->to_email) ||
+        str_is_empty(request->subject) ||
+        (str_is_empty(request->html_content) && str_is_empty(request->text_content))) {
+        LOG_ERROR("Brevo send email request missing required fields");
+        return -1;
+    }
+
+    cJSON *body = cJSON_CreateObject();
+    cJSON *sender = cJSON_CreateObject();
+    cJSON *to_array = cJSON_CreateArray();
+    cJSON *to = cJSON_CreateObject();
+
+    if (body == NULL || sender == NULL || to_array == NULL || to == NULL) {
+        cJSON_Delete(body);
+        cJSON_Delete(sender);
+        cJSON_Delete(to_array);
+        cJSON_Delete(to);
+        return -1;
+    }
+
+    cJSON_AddStringToObject(sender, "email", request->sender_email);
+    if (!str_is_empty(request->sender_name)) {
+        cJSON_AddStringToObject(sender, "name", request->sender_name);
+    }
+    cJSON_AddItemToObject(body, "sender", sender);
+
+    cJSON_AddStringToObject(to, "email", request->to_email);
+    if (!str_is_empty(request->to_name)) {
+        cJSON_AddStringToObject(to, "name", request->to_name);
+    }
+    cJSON_AddItemToArray(to_array, to);
+    cJSON_AddItemToObject(body, "to", to_array);
+
+    cJSON_AddStringToObject(body, "subject", request->subject);
+
+    if (!str_is_empty(request->html_content)) {
+        cJSON_AddStringToObject(body, "htmlContent", request->html_content);
+    }
+    if (!str_is_empty(request->text_content)) {
+        cJSON_AddStringToObject(body, "textContent", request->text_content);
+    }
+
+    if (!str_is_empty(request->reply_to_email)) {
+        cJSON *reply_to = cJSON_CreateObject();
+        if (reply_to == NULL) {
+            cJSON_Delete(body);
+            return -1;
+        }
+        cJSON_AddStringToObject(reply_to, "email", request->reply_to_email);
+        if (!str_is_empty(request->reply_to_name)) {
+            cJSON_AddStringToObject(reply_to, "name", request->reply_to_name);
+        }
+        cJSON_AddItemToObject(body, "replyTo", reply_to);
+    }
+
+    if (!str_is_empty(request->tag)) {
+        cJSON *tags = cJSON_CreateArray();
+        if (tags == NULL) {
+            cJSON_Delete(body);
+            return -1;
+        }
+        cJSON_AddItemToArray(tags, cJSON_CreateString(request->tag));
+        cJSON_AddItemToObject(body, "tags", tags);
+    }
+
+    if (brevo_state.sandbox_mode) {
+        cJSON *headers = cJSON_CreateObject();
+        if (headers == NULL) {
+            cJSON_Delete(body);
+            return -1;
+        }
+        cJSON_AddStringToObject(headers, "X-Sib-Sandbox", "drop");
+        cJSON_AddItemToObject(body, "headers", headers);
+    }
+
+    char *body_str = cJSON_PrintUnformatted(body);
+    cJSON_Delete(body);
+    if (body_str == NULL) {
+        return -1;
+    }
+
+    long http_code = 0;
+    char *response = brevo_api_request("POST", "/smtp/email", body_str, &http_code);
+    free(body_str);
+
+    if (response == NULL) {
+        return -1;
+    }
+
+    if (http_code != 201 && http_code != 200) {
+        brevo_log_http_error("send email", http_code, response);
+        free(response);
+        return -1;
+    }
+
+    cJSON *json = json_parse(response);
+    if (json != NULL && message_id_out != NULL) {
+        const char *message_id = json_get_string(json, "messageId", NULL);
+        if (!str_is_empty(message_id)) {
+            *message_id_out = str_dup(message_id);
+        }
+    }
+    cJSON_Delete(json);
+
+    if (message_id_out != NULL && *message_id_out != NULL) {
+        LOG_INFO("Brevo transactional email queued for %s (%s)",
+                 request->to_email, *message_id_out);
+    } else {
+        LOG_INFO("Brevo transactional email queued for %s", request->to_email);
+    }
+
+    free(response);
+    return 0;
 }

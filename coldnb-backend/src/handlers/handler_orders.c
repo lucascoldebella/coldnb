@@ -1,6 +1,7 @@
 #include "handlers/handler_orders.h"
 #include "auth/auth_middleware.h"
 #include "db/db_query.h"
+#include "services/svc_email.h"
 #include "util/json_util.h"
 #include "util/string_util.h"
 #include "util/uuid_util.h"
@@ -52,6 +53,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     const char *discount_code = json_get_string(body, "discount_code", NULL);
     const char *payment_method = json_get_string(body, "payment_method", "card");
     const char *notes = json_get_string(body, "notes", NULL);
+    char *payment_method_copy = NULL;
+    char *notes_copy = NULL;
 
     if (str_is_empty(shipping_address_id)) {
         cJSON_Delete(body);
@@ -73,7 +76,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     }
 
     /* Get user's internal ID */
-    const char *user_query = "SELECT id FROM users WHERE id = $1 OR supabase_id = $1";
+    const char *user_query =
+        "SELECT id, email, full_name FROM users WHERE id = $1 OR supabase_id = $1";
     const char *user_params[] = { user_id };
     PGresult *user_result = db_exec_params(conn, user_query, 1, user_params);
 
@@ -85,8 +89,13 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
         return;
     }
 
-    const char *internal_user_id = db_result_value(user_result);
+    DbRow user_row = { .result = user_result, .row = 0 };
+    const char *internal_user_id = db_row_get_string(&user_row, "id");
+    const char *customer_email_value = db_row_get_string(&user_row, "email");
+    const char *customer_name_value = db_row_get_string(&user_row, "full_name");
     char *user_id_copy = str_dup(internal_user_id);
+    char *customer_email = customer_email_value ? str_dup(customer_email_value) : NULL;
+    char *customer_name = customer_name_value ? str_dup(customer_name_value) : NULL;
     PQclear(user_result);
 
     /* Get shipping address */
@@ -100,6 +109,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     if (!db_result_ok(addr_result) || !db_result_has_rows(addr_result)) {
         PQclear(addr_result);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
         db_pool_release(pool, conn);
         cJSON_Delete(body);
         http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Shipping address not found");
@@ -144,6 +155,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     if (!db_result_ok(cart_result) || !db_result_has_rows(cart_result)) {
         PQclear(cart_result);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
         free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
         free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
         db_pool_release(pool, conn);
@@ -166,6 +179,8 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
             const char *product_name = db_row_get_string(&row, "name");
             PQclear(cart_result);
             free(user_id_copy);
+            free(customer_email);
+            free(customer_name);
             free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
             free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
             db_pool_release(pool, conn);
@@ -231,6 +246,9 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
         PQclear(discount_result);
     }
 
+    payment_method_copy = str_dup(payment_method ? payment_method : "card");
+    notes_copy = notes ? str_dup(notes) : NULL;
+
     cJSON_Delete(body);
 
     /* Calculate totals */
@@ -243,6 +261,10 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     if (order_number == NULL) {
         PQclear(cart_result);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
+        free(payment_method_copy);
+        free(notes_copy);
         free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
         free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
         free(validated_discount_code);
@@ -255,6 +277,10 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     if (!db_begin(conn)) {
         PQclear(cart_result);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
+        free(payment_method_copy);
+        free(notes_copy);
         free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
         free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
         free(validated_discount_code);
@@ -282,11 +308,11 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     snprintf(total_str, sizeof(total_str), "%.2f", total);
 
     const char *order_params[] = {
-        order_number, user_id_copy, payment_method,
+        order_number, user_id_copy, payment_method_copy,
         addr_name, addr_phone, addr_street, addr_street2,
         addr_city, addr_state, addr_postal, addr_country,
         subtotal_str, shipping_str, tax_str, discount_str, validated_discount_code,
-        total_str, notes
+        total_str, notes_copy
     };
 
     PGresult *order_result = db_exec_params(conn, order_query, 18, order_params);
@@ -296,6 +322,10 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
         db_rollback(conn);
         PQclear(cart_result);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
+        free(payment_method_copy);
+        free(notes_copy);
         free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
         free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
         free(validated_discount_code);
@@ -347,6 +377,10 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
             PQclear(cart_result);
             free(order_id);
             free(user_id_copy);
+            free(customer_email);
+            free(customer_name);
+            free(payment_method_copy);
+            free(notes_copy);
             free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
             free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
             free(validated_discount_code);
@@ -395,6 +429,10 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
         db_rollback(conn);
         free(order_id);
         free(user_id_copy);
+        free(customer_email);
+        free(customer_name);
+        free(payment_method_copy);
+        free(notes_copy);
         free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
         free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
         free(validated_discount_code);
@@ -419,8 +457,30 @@ void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data
     cJSON_AddNumberToObject(data, "total", total);
     cJSON_AddNumberToObject(data, "item_count", item_count);
 
+    EmailOrderCreated email_order = {
+        .order_number = order_number,
+        .customer_email = customer_email,
+        .customer_name = customer_name,
+        .payment_method = payment_method_copy,
+        .shipping_city = addr_city,
+        .shipping_state = addr_state,
+        .customer_notes = notes_copy,
+        .total = total,
+        .item_count = item_count
+    };
+    if (email_service_send_order_confirmation(&email_order) != 0) {
+        LOG_WARN("Order confirmation email failed for order %s", order_number);
+    }
+    if (email_service_send_internal_order_notification(&email_order) != 0) {
+        LOG_WARN("Internal order notification email failed for order %s", order_number);
+    }
+
     free(order_id);
     free(user_id_copy);
+    free(customer_email);
+    free(customer_name);
+    free(payment_method_copy);
+    free(notes_copy);
     free(addr_name); free(addr_phone); free(addr_street); free(addr_street2);
     free(addr_city); free(addr_state); free(addr_postal); free(addr_country);
     free(validated_discount_code);

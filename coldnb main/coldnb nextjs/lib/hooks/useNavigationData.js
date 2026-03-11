@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { buildApiUrl } from "@/lib/apiBase";
 import {
   demoItems,
   shopLayout,
@@ -11,8 +12,6 @@ import {
   blogLinks,
   otherPageLinks,
 } from "@/data/menu";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 /**
  * Build static fallback menu structure matching the API shape.
@@ -83,7 +82,7 @@ export default function useNavigationData() {
 
     async function fetchNav() {
       try {
-        const res = await axios.get(`${API_BASE}/api/navigation`, { timeout: 5000 });
+        const res = await axios.get(buildApiUrl("/api/navigation"), { timeout: 5000 });
         const menus = res?.data?.data?.menus;
         if (!Array.isArray(menus) || menus.length === 0) {
           throw new Error("Empty response");

@@ -58,6 +58,20 @@ pix_enabled = true
 [brevo]
 api_key_file = /etc/coldnb/secrets/brevo_api_key
 list_id = 1
+sandbox_mode = false
+
+# =============================================================================
+# Transactional Email (Brevo API)
+# =============================================================================
+[email]
+store_name = Coldnb
+site_url = https://coldnb.com
+sender_email = noreply@coldnb.com
+sender_name = Coldnb
+reply_to_email = support@coldnb.com
+reply_to_name = Coldnb Support
+notification_email = support@coldnb.com
+notification_name = Coldnb Support
 
 # =============================================================================
 # File Uploads

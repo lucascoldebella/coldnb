@@ -11,7 +11,10 @@
 typedef struct {
     char *user_id;          /* User ID (UUID) */
     char *email;
+    char *full_name;
+    char *phone;
     char *role;
+    bool email_verified;
     bool is_admin;          /* True if authenticated as admin */
 } AuthContext;
 

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAdmin } from "@/context/AdminContext";
+import ThemeToggle from "@/components/common/ThemeToggle";
 
 const MenuIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -65,6 +66,7 @@ const breadcrumbMap = {
   "/admin/orders": "Orders",
   "/admin/customers": "Customers",
   "/admin/marketing": "Marketing",
+  "/admin/email": "E-mail",
   "/admin/team": "Team",
   "/admin/team/new": "New Employee",
 };
@@ -163,6 +165,8 @@ export default function AdminHeader() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </form>
+
+        <ThemeToggle />
 
         <button className="header-icon-btn">
           <BellIcon />

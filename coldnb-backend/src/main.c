@@ -10,6 +10,7 @@
 #include "auth/auth_supabase.h"
 #include "auth/auth_middleware.h"
 #include "services/svc_admin_auth.h"
+#include "services/svc_email.h"
 #include "clients/client_stripe.h"
 #include "clients/client_brevo.h"
 #include "middleware/middleware_analytics.h"
@@ -139,17 +140,20 @@ static DbPool *init_database(const Config *config) {
 static int init_supabase(const Config *config) {
     char *jwt_secret = config_load_secret(config, "supabase.jwt_secret_file");
     char *anon_key = config_load_secret(config, "supabase.anon_key_file");
+    char *service_role_key = config_load_secret(config, "supabase.service_role_key_file");
 
     if (jwt_secret == NULL) {
         LOG_ERROR("Failed to load Supabase JWT secret");
         free(anon_key);
+        free(service_role_key);
         return -1;
     }
 
     SupabaseConfig supabase_config = {
         .project_url = config_get_string(config, "supabase.project_url", NULL),
         .jwt_secret = jwt_secret,
-        .anon_key = anon_key
+        .anon_key = anon_key,
+        .service_role_key = service_role_key
     };
 
     int result = supabase_init(&supabase_config);
@@ -162,6 +166,10 @@ static int init_supabase(const Config *config) {
     if (anon_key != NULL) {
         memset(anon_key, 0, strlen(anon_key));
         free(anon_key);
+    }
+    if (service_role_key != NULL) {
+        memset(service_role_key, 0, strlen(service_role_key));
+        free(service_role_key);
     }
 
     return result;
@@ -231,7 +239,8 @@ static int init_brevo(const Config *config) {
 
     BrevoConfig brevo_config = {
         .api_key = api_key,
-        .list_id = config_get_int(config, "brevo.list_id", 1)
+        .list_id = config_get_int(config, "brevo.list_id", 1),
+        .sandbox_mode = config_get_bool(config, "brevo.sandbox_mode", false)
     };
 
     int result = brevo_init(&brevo_config);
@@ -241,6 +250,21 @@ static int init_brevo(const Config *config) {
     free(api_key);
 
     return result;
+}
+
+static int init_email_service(const Config *config) {
+    EmailServiceConfig email_config = {
+        .store_name = config_get_string(config, "email.store_name", "Coldnb"),
+        .site_url = config_get_string(config, "email.site_url", "https://coldnb.com"),
+        .sender_email = config_get_string(config, "email.sender_email", NULL),
+        .sender_name = config_get_string(config, "email.sender_name", NULL),
+        .reply_to_email = config_get_string(config, "email.reply_to_email", NULL),
+        .reply_to_name = config_get_string(config, "email.reply_to_name", NULL),
+        .notification_email = config_get_string(config, "email.notification_email", NULL),
+        .notification_name = config_get_string(config, "email.notification_name", NULL)
+    };
+
+    return email_service_init(&email_config);
 }
 
 /* Create and configure HTTP server from config */
@@ -436,6 +460,11 @@ int main(int argc, char *argv[]) {
         LOG_WARN("Brevo initialization failed, email marketing will be unavailable");
     }
 
+    /* Initialize transactional email service (optional) */
+    if (init_email_service(config) != 0) {
+        LOG_WARN("Email service initialization failed, transactional emails will be unavailable");
+    }
+
     /* Set database pool for admin middleware */
     auth_middleware_set_db_pool(db_pool);
 
@@ -458,6 +487,7 @@ int main(int argc, char *argv[]) {
     HttpServer *server = create_server(config, port_override);
     if (server == NULL) {
         LOG_FATAL("Failed to create HTTP server");
+        email_service_shutdown();
         brevo_shutdown();
         stripe_shutdown();
         admin_auth_shutdown();
@@ -475,6 +505,7 @@ int main(int argc, char *argv[]) {
     if (setup_signals() != 0) {
         LOG_FATAL("Failed to setup signal handlers");
         http_server_free(server);
+        email_service_shutdown();
         brevo_shutdown();
         stripe_shutdown();
         admin_auth_shutdown();
@@ -511,6 +542,7 @@ int main(int argc, char *argv[]) {
     g_server = NULL;
     http_server_free(server);
     rate_limit_shutdown();
+    email_service_shutdown();
     brevo_shutdown();
     stripe_shutdown();
     admin_auth_shutdown();

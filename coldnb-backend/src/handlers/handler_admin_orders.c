@@ -1,6 +1,7 @@
 #include "handlers/handler_admin_orders.h"
 #include "auth/auth_middleware.h"
 #include "db/db_query.h"
+#include "services/svc_email.h"
 #include "util/json_util.h"
 #include "util/string_util.h"
 #include "util/uuid_util.h"
@@ -285,6 +286,8 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
 
     const char *status = json_get_string(body, "status", NULL);
     const char *notes = json_get_string(body, "notes", NULL);
+    char *status_copy = NULL;
+    char *notes_copy = NULL;
 
     if (str_is_empty(status)) {
         cJSON_Delete(body);
@@ -298,12 +301,17 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
         return;
     }
 
+    status_copy = str_dup(status);
+    notes_copy = notes ? str_dup(notes) : NULL;
+
     AuthContext *auth = auth_get_context(req);
     const char *admin_id = auth ? auth->user_id : NULL;
 
     PGconn *conn = db_pool_acquire(pool);
     if (conn == NULL) {
         cJSON_Delete(body);
+        free(status_copy);
+        free(notes_copy);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
         return;
     }
@@ -311,6 +319,8 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     if (!db_begin(conn)) {
         db_pool_release(pool, conn);
         cJSON_Delete(body);
+        free(status_copy);
+        free(notes_copy);
         http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Transaction failed");
         return;
     }
@@ -319,7 +329,7 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     const char *update_query =
         "UPDATE orders SET status = $1, updated_at = NOW() "
         "WHERE id = $2 RETURNING order_number";
-    const char *update_params[] = { status, order_id };
+    const char *update_params[] = { status_copy, order_id };
 
     PGresult *update_result = db_exec_params(conn, update_query, 2, update_params);
 
@@ -328,6 +338,8 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
         db_rollback(conn);
         db_pool_release(pool, conn);
         cJSON_Delete(body);
+        free(status_copy);
+        free(notes_copy);
         http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Order not found");
         return;
     }
@@ -336,18 +348,36 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     char *order_num_copy = str_dup(order_number);
     PQclear(update_result);
 
+    const char *notify_query =
+        "SELECT u.email, u.full_name "
+        "FROM orders o "
+        "LEFT JOIN users u ON o.user_id = u.id "
+        "WHERE o.id = $1";
+    const char *notify_params[] = { order_id };
+    PGresult *notify_result = db_exec_params(conn, notify_query, 1, notify_params);
+    char *customer_email = NULL;
+    char *customer_name = NULL;
+    if (db_result_ok(notify_result) && db_result_has_rows(notify_result)) {
+        DbRow notify_row = { .result = notify_result, .row = 0 };
+        const char *email_value = db_row_get_string(&notify_row, "email");
+        const char *name_value = db_row_get_string(&notify_row, "full_name");
+        customer_email = email_value ? str_dup(email_value) : NULL;
+        customer_name = name_value ? str_dup(name_value) : NULL;
+    }
+    PQclear(notify_result);
+
     /* Update timestamp fields based on status */
-    if (strcmp(status, "shipped") == 0) {
+    if (strcmp(status_copy, "shipped") == 0) {
         const char *ship_query = "UPDATE orders SET shipped_at = NOW() WHERE id = $1";
         const char *ship_params[] = { order_id };
         PGresult *ship_result = db_exec_params(conn, ship_query, 1, ship_params);
         PQclear(ship_result);
-    } else if (strcmp(status, "delivered") == 0) {
+    } else if (strcmp(status_copy, "delivered") == 0) {
         const char *deliver_query = "UPDATE orders SET delivered_at = NOW() WHERE id = $1";
         const char *deliver_params[] = { order_id };
         PGresult *deliver_result = db_exec_params(conn, deliver_query, 1, deliver_params);
         PQclear(deliver_result);
-    } else if (strcmp(status, "cancelled") == 0) {
+    } else if (strcmp(status_copy, "cancelled") == 0) {
         const char *cancel_query = "UPDATE orders SET cancelled_at = NOW() WHERE id = $1";
         const char *cancel_params[] = { order_id };
         PGresult *cancel_result = db_exec_params(conn, cancel_query, 1, cancel_params);
@@ -358,20 +388,29 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     const char *history_query =
         "INSERT INTO order_history (order_id, status, notes, created_by) "
         "VALUES ($1, $2, $3, $4)";
-    const char *history_params[] = { order_id, status, notes, admin_id };
+    const char *history_params[] = { order_id, status_copy, notes_copy, admin_id };
     PGresult *history_result = db_exec_params(conn, history_query, 4, history_params);
     PQclear(history_result);
 
-    db_commit(conn);
+    if (!db_commit(conn)) {
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        cJSON_Delete(body);
+        free(order_num_copy);
+        free(customer_email);
+        free(customer_name);
+        free(status_copy);
+        free(notes_copy);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to update order status");
+        return;
+    }
     db_pool_release(pool, conn);
     cJSON_Delete(body);
 
     cJSON *data = cJSON_CreateObject();
     cJSON_AddStringToObject(data, "order_number", order_num_copy);
-    cJSON_AddStringToObject(data, "status", status);
+    cJSON_AddStringToObject(data, "status", status_copy);
     cJSON_AddStringToObject(data, "message", "Order status updated");
-
-    free(order_num_copy);
 
     cJSON *response = json_create_success(data);
     char *json = cJSON_PrintUnformatted(response);
@@ -380,7 +419,22 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     http_response_json(resp, HTTP_STATUS_OK, json);
     free(json);
 
-    LOG_INFO("Order %s status updated to: %s", order_id, status);
+    EmailOrderStatusUpdate email_update = {
+        .order_number = order_num_copy,
+        .customer_email = customer_email,
+        .customer_name = customer_name,
+        .status = status_copy
+    };
+    if (email_service_send_order_status_update(&email_update) != 0) {
+        LOG_WARN("Order status email failed for order %s", order_num_copy);
+    }
+
+    LOG_INFO("Order %s status updated to: %s", order_id, status_copy);
+    free(order_num_copy);
+    free(customer_email);
+    free(customer_name);
+    free(status_copy);
+    free(notes_copy);
 }
 
 void handler_admin_users_list(HttpRequest *req, HttpResponse *resp, void *user_data) {

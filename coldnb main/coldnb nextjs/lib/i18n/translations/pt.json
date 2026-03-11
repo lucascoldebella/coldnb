@@ -249,6 +249,29 @@
     "information": "Informações",
     "usernameOrEmail": "Nome de usuário ou e-mail*"
   },
+  "clientPanel": {
+    "title": "Painel do cliente",
+    "subtitle": "Uma área simples para acompanhar sua conta enquanto novas funções são desenvolvidas.",
+    "accountStatus": "Status da conta",
+    "accountReady": "Pronta",
+    "accountPending": "Pendente",
+    "accountReadyHint": "Seu perfil principal já está preenchido.",
+    "accountPendingHint": "Complete nome e telefone para deixar a conta pronta.",
+    "authenticatedWith": "Autenticado com",
+    "orders": "Pedidos",
+    "ordersHint": "Quantidade de pedidos vinculados à sua conta.",
+    "defaultAddress": "Endereço padrão",
+    "defaultAddressHint": "Adicione um endereço para agilizar o checkout.",
+    "nextFeatures": "Próximas funções",
+    "nextFeaturesHint": "Este painel já está preparado para receber novos módulos.",
+    "tracking": "Rastreamento de pacotes",
+    "returns": "Solicitação de devoluções",
+    "postSales": "Suporte pós-venda",
+    "viewOrders": "Ver pedidos",
+    "manageAddresses": "Gerenciar endereços",
+    "continueShopping": "Continuar comprando",
+    "notAvailable": "Indisponível"
+  },
   "checkout": {
     "title": "Finalizar Compra",
     "billingAddress": "Endereço de Cobrança",
@@ -298,7 +321,16 @@
     "addVoucherDiscount": "Adicionar cupom de desconto",
     "discountNote": "Código de desconto válido apenas para pedidos acima de R$ 500,00",
     "enterCep": "Inserir CEP",
-    "discounts": "Descontos"
+    "discounts": "Descontos",
+    "continueToPayment": "Continuar para Pagamento",
+    "creatingOrder": "Criando pedido...",
+    "confirmPayment": "Confirmar Pagamento",
+    "orderCreated": "Pedido criado:",
+    "paymentFailed": "Pagamento falhou. Por favor, tente novamente.",
+    "orderFailed": "Falha ao criar pedido. Por favor, tente novamente.",
+    "fillRequired": "Por favor, preencha todos os campos obrigatórios.",
+    "cartEmpty": "Seu carrinho está vazio.",
+    "paymentNotConfigured": "Sistema de pagamento indisponível. Tente novamente mais tarde."
   },
   "shopCart": {
     "title": "Carrinho de Compras",
@@ -653,6 +685,7 @@
     "createWithEmail": "Criar conta com e-mail",
     "continueWithGoogle": "Continuar com Google",
     "continueWithApple": "Continuar com Apple",
+    "redirecting": "Redirecionando...",
     "orContinueWith": "ou continue com",
     "back": "Voltar",
     "next": "Próximo",
@@ -664,6 +697,8 @@
     "createPassword": "Crie uma senha",
     "createAccount": "Criar Conta",
     "passwordTooShort": "A senha deve ter pelo menos 6 caracteres",
+    "fullNameRequired": "Informe seu nome completo",
+    "phoneRequired": "Informe um telefone válido",
     "addYourAddress": "Adicione seu endereço",
     "deliveryAddress": "Endereço de entrega",
     "addressOptional": "Você pode pular e adicionar depois",
@@ -676,13 +711,26 @@
     "city": "Cidade",
     "state": "Estado",
     "saveAddress": "Salvar Endereço",
+    "saving": "Salvando...",
+    "savingAddress": "Salvando endereço...",
     "skipForNow": "Pular por Agora",
     "addressSaveError": "Erro ao salvar endereço",
     "home": "Casa",
     "resetPassword": "Redefinir Senha",
     "resetPasswordSent": "E-mail de redefinição enviado!",
     "profileUpdated": "Perfil atualizado com sucesso!",
-    "profileUpdateError": "Erro ao atualizar perfil"
+    "profileUpdateError": "Erro ao atualizar perfil",
+    "oauthError": "Não foi possível iniciar a autenticação social.",
+    "authNotConfigured": "A autenticação ainda não foi configurada.",
+    "finishingSignIn": "Concluindo seu acesso",
+    "confirmEmailNotice": "Conta criada. Confira seu e-mail para confirmar a conta e depois continue por aqui.",
+    "confirmEmailSuccess": "Seu e-mail foi confirmado com sucesso! Redirecionando...",
+    "authCallbackError": "Não foi possível concluir o login. Tente novamente.",
+    "authCallbackFailed": "Falha na autenticação",
+    "backToLogin": "Voltar para o login",
+    "deleteAccount": "Excluir minha conta",
+    "deleteAccountSuccess": "Conta excluída com sucesso.",
+    "deleteAccountError": "Não foi possível excluir a conta agora."
   },
   "homepage": {
     "todaysTopPicks": "Destaques de Hoje",
@@ -841,5 +889,11 @@
     "trackingOrders": "Rastrear Pedidos",
     "alreadyHaveAccount": "Já tem uma conta?",
     "welcomeBack": "Bem-vindo de volta, faça login para continuar comprando."
+  },
+  "cookie": {
+    "message": "Utilizamos cookies para melhorar sua experiência de navegação e analisar o tráfego do site. Ao continuar usando nosso site, você consente com o uso de cookies.",
+    "accept": "Aceitar",
+    "decline": "Recusar",
+    "learnMore": "Saiba mais"
   }
 }

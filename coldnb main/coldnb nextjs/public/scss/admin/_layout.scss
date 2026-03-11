@@ -469,6 +469,35 @@
   }
 }
 
+// Dark mode header glassmorphism
+:root[data-theme="dark"] {
+  .admin-header {
+    background-color: rgba(12, 15, 26, 0.85);
+  }
+
+  .admin-header .header-search input {
+    color: var(--admin-text-primary);
+  }
+
+  // Dropdown
+  .dropdown-menu {
+    background-color: var(--admin-surface);
+    border-color: var(--admin-border);
+
+    .dropdown-item {
+      color: var(--admin-text-primary);
+
+      &:hover {
+        background-color: var(--admin-surface-hover);
+      }
+    }
+
+    .dropdown-divider {
+      border-color: var(--admin-border);
+    }
+  }
+}
+
 @media (max-width: 640px) {
   .admin-content {
     padding: 16px;

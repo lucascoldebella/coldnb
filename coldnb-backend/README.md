@@ -88,7 +88,7 @@ make clean
    echo "sk_live_..." | sudo tee /etc/coldnb/secrets/stripe_secret_key
    echo "whsec_..." | sudo tee /etc/coldnb/secrets/stripe_webhook_secret
 
-   # Brevo API key
+   # Brevo API key (for backend newsletter + transactional emails)
    echo "xkeysib-..." | sudo tee /etc/coldnb/secrets/brevo_api_key
 
    # Secure the secrets
@@ -96,6 +96,10 @@ make clean
    ```
 
 3. Edit `/etc/coldnb/server.conf` with your settings.
+
+Important:
+- The backend Brevo client uses the Brevo HTTP API and requires an API v3 key (`xkeysib-...`).
+- Supabase custom SMTP uses SMTP relay credentials (`xsmtpsib-...`) in the Supabase dashboard, not in `brevo_api_key`.
 
 ## Database Setup
 

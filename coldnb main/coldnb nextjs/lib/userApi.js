@@ -1,8 +1,9 @@
 import axios from "axios";
 import supabase from "./supabase";
+import { getApiBaseUrl } from "./apiBase";
 
 const userApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },
@@ -39,6 +40,7 @@ userApi.interceptors.response.use(
 export const profileApi = {
   get: () => userApi.get("/api/user/profile"),
   update: (data) => userApi.put("/api/user/profile", data),
+  deleteAccount: () => userApi.delete("/api/user/profile"),
 };
 
 // Addresses API
@@ -54,6 +56,16 @@ export const addressesApi = {
 export const ordersApi = {
   list: (params = {}) => userApi.get("/api/orders", { params }),
   get: (id) => userApi.get(`/api/orders/${id}`),
+};
+
+// Cart API
+export const cartApi = {
+  get: () => userApi.get("/api/cart"),
+  add: (product_id, quantity = 1, color_id = null, size_id = null) =>
+    userApi.post("/api/cart", { product_id, quantity, color_id, size_id }),
+  update: (id, quantity) => userApi.put(`/api/cart/${id}`, { quantity }),
+  remove: (id) => userApi.delete(`/api/cart/${id}`),
+  clear: () => userApi.delete("/api/cart"),
 };
 
 export default userApi;

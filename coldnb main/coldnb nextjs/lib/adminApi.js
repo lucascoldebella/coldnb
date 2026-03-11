@@ -1,8 +1,9 @@
 import axios from "axios";
+import { getApiBaseUrl } from "./apiBase";
 
 // Create axios instance for admin API
 const adminApi = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080",
+  baseURL: getApiBaseUrl(),
   headers: {
     "Content-Type": "application/json",
   },

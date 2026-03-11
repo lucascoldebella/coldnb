@@ -31,6 +31,8 @@ void auth_context_free(AuthContext *ctx) {
     }
     free(ctx->user_id);
     free(ctx->email);
+    free(ctx->full_name);
+    free(ctx->phone);
     free(ctx->role);
     free(ctx);
 }
@@ -56,7 +58,10 @@ static AuthContext *try_authenticate(HttpRequest *req) {
 
     ctx->user_id = user->user_id ? str_dup(user->user_id) : NULL;
     ctx->email = user->email ? str_dup(user->email) : NULL;
+    ctx->full_name = user->full_name ? str_dup(user->full_name) : NULL;
+    ctx->phone = user->phone ? str_dup(user->phone) : NULL;
     ctx->role = user->role ? str_dup(user->role) : NULL;
+    ctx->email_verified = user->email_verified;
     ctx->is_admin = false;  /* User auth, not admin */
 
     supabase_user_free(user);

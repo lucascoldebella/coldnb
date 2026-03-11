@@ -249,6 +249,29 @@
     "information": "Information",
     "usernameOrEmail": "Username or email address*"
   },
+  "clientPanel": {
+    "title": "Client panel",
+    "subtitle": "A simple customer area for testing while new account features are being built.",
+    "accountStatus": "Account status",
+    "accountReady": "Ready",
+    "accountPending": "Pending",
+    "accountReadyHint": "Your main profile details are already filled in.",
+    "accountPendingHint": "Add your name and phone to finish setting up the account.",
+    "authenticatedWith": "Authenticated with",
+    "orders": "Orders",
+    "ordersHint": "Number of orders linked to your account.",
+    "defaultAddress": "Default address",
+    "defaultAddressHint": "Add an address to make checkout faster.",
+    "nextFeatures": "Next features",
+    "nextFeaturesHint": "This panel is ready to receive new modules.",
+    "tracking": "Package tracking",
+    "returns": "Return requests",
+    "postSales": "Post-sale support",
+    "viewOrders": "View orders",
+    "manageAddresses": "Manage addresses",
+    "continueShopping": "Continue shopping",
+    "notAvailable": "Unavailable"
+  },
   "checkout": {
     "title": "Checkout",
     "billingAddress": "Billing Address",
@@ -298,7 +321,16 @@
     "addVoucherDiscount": "Add voucher discount",
     "discountNote": "Discount code is only used for orders with a total value of products over $500.00",
     "enterCep": "Enter CEP",
-    "discounts": "Discounts"
+    "discounts": "Discounts",
+    "continueToPayment": "Continue to Payment",
+    "creatingOrder": "Creating order...",
+    "confirmPayment": "Confirm Payment",
+    "orderCreated": "Order created:",
+    "paymentFailed": "Payment failed. Please try again.",
+    "orderFailed": "Failed to create order. Please try again.",
+    "fillRequired": "Please fill in all required fields.",
+    "cartEmpty": "Your cart is empty.",
+    "paymentNotConfigured": "Payment system not available. Please try again later."
   },
   "shopCart": {
     "title": "Shopping Cart",
@@ -653,6 +685,7 @@
     "createWithEmail": "Create account with email",
     "continueWithGoogle": "Continue with Google",
     "continueWithApple": "Continue with Apple",
+    "redirecting": "Redirecting...",
     "orContinueWith": "or continue with",
     "back": "Back",
     "next": "Next",
@@ -664,6 +697,8 @@
     "createPassword": "Create a password",
     "createAccount": "Create Account",
     "passwordTooShort": "Password must be at least 6 characters",
+    "fullNameRequired": "Enter your full name",
+    "phoneRequired": "Enter a valid phone number",
     "addYourAddress": "Add your address",
     "deliveryAddress": "Delivery Address",
     "addressOptional": "You can skip and add it later",
@@ -676,13 +711,26 @@
     "city": "City",
     "state": "State",
     "saveAddress": "Save Address",
+    "saving": "Saving...",
+    "savingAddress": "Saving address...",
     "skipForNow": "Skip for Now",
     "addressSaveError": "Error saving address",
     "home": "Home",
     "resetPassword": "Reset Password",
     "resetPasswordSent": "Password reset email sent!",
     "profileUpdated": "Profile updated successfully!",
-    "profileUpdateError": "Error updating profile"
+    "profileUpdateError": "Error updating profile",
+    "oauthError": "Could not start social sign-in.",
+    "authNotConfigured": "Authentication is not configured yet.",
+    "finishingSignIn": "Finishing your sign in",
+    "confirmEmailNotice": "Account created. Check your email to confirm your account, then continue here.",
+    "confirmEmailSuccess": "Your email was confirmed successfully! Redirecting...",
+    "authCallbackError": "Could not complete sign in. Please try again.",
+    "authCallbackFailed": "Authentication failed",
+    "backToLogin": "Back to login",
+    "deleteAccount": "Delete my account",
+    "deleteAccountSuccess": "Account deleted successfully.",
+    "deleteAccountError": "Could not delete the account right now."
   },
   "homepage": {
     "todaysTopPicks": "Today's Top Picks",
@@ -841,5 +889,11 @@
     "trackingOrders": "Tracking Orders",
     "alreadyHaveAccount": "Already have an account?",
     "welcomeBack": "Welcome back, sign in to continue shopping."
+  },
+  "cookie": {
+    "message": "We use cookies to enhance your browsing experience and analyze site traffic. By continuing to use our site, you consent to the use of cookies.",
+    "accept": "Accept",
+    "decline": "Decline",
+    "learnMore": "Learn more"
   }
 }

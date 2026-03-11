@@ -8,6 +8,7 @@ import ToolbarBottom from "../headers/ToolbarBottom";
 import ScrollTop from "../common/ScrollTop";
 import { socialLinks } from "@/data/footerLinks";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { buildApiUrl } from "@/lib/apiBase";
 
 export default function Footer1({
   border = true,
@@ -17,6 +18,7 @@ export default function Footer1({
   const { t } = useLanguage();
   const [success, setSuccess] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handleShowMessage = () => {
     setShowMessage(true);
@@ -27,11 +29,27 @@ export default function Footer1({
 
   const sendEmail = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     const email = e.target.email.value;
-    console.log("Newsletter signup (configure your service):", email);
-    e.target.reset();
-    setSuccess(true);
-    handleShowMessage();
+    setSubmitting(true);
+    try {
+      const res = await fetch(buildApiUrl("/api/newsletter/subscribe"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setSuccess(true);
+        e.target.reset();
+      } else {
+        setSuccess(false);
+      }
+    } catch {
+      setSuccess(false);
+    } finally {
+      setSubmitting(false);
+      handleShowMessage();
+    }
   };
 
   const translatedFooterLinks = [

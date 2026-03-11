@@ -61,6 +61,13 @@ const MarketingIcon = () => (
   </svg>
 );
 
+const EmailIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
 const HomepageIcon = () => (
   <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -132,6 +139,7 @@ export default function AdminSidebar() {
     {
       title: "Settings",
       items: [
+        { path: "/admin/email", label: "E-mail", icon: EmailIcon, section: "email" },
         { path: "/admin/team", label: "Team", icon: TeamIcon, section: "team" },
       ],
     },

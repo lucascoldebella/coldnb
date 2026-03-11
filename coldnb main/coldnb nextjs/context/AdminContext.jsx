@@ -72,6 +72,7 @@ export function AdminProvider({ children }) {
       orders: ["view_orders"],
       customers: ["view_customers"],
       marketing: ["view_marketing"],
+      email: ["view_marketing"],
       team: ["manage_team"],
       homepage: ["manage_homepage"],
       shipping: ["view_products"],

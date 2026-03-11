@@ -11,11 +11,13 @@
 void handler_user_register(HttpRouter *router, DbPool *pool) {
     ROUTE_GET(router, "/api/user/profile", handler_user_profile_get, pool);
     ROUTE_PUT(router, "/api/user/profile", handler_user_profile_update, pool);
+    ROUTE_DELETE(router, "/api/user/profile", handler_user_profile_delete, pool);
 }
 
 void handler_user_profile_get(HttpRequest *req, HttpResponse *resp, void *user_data) {
     DbPool *pool = (DbPool *)user_data;
     const char *user_id = auth_get_user_id(req);
+    AuthContext *auth = auth_get_context(req);
 
     if (user_id == NULL) {
         http_response_error(resp, HTTP_STATUS_UNAUTHORIZED, "Authentication required");
@@ -28,39 +30,31 @@ void handler_user_profile_get(HttpRequest *req, HttpResponse *resp, void *user_d
         return;
     }
 
-    const char *query =
-        "SELECT id, email, full_name, phone, avatar_url, email_verified, created_at "
-        "FROM users WHERE id = $1 OR supabase_id = $1";
-    const char *params[] = { user_id };
+    const char *email = (auth != NULL) ? auth->email : NULL;
+    const char *full_name = (auth != NULL) ? auth->full_name : NULL;
+    const char *phone = (auth != NULL) ? auth->phone : NULL;
+    const char *email_verified = (auth != NULL && auth->email_verified) ? "true" : "false";
 
-    PGresult *result = db_exec_params(conn, query, 1, params);
+    const char *upsert_query =
+        "INSERT INTO users (supabase_id, email, full_name, phone, email_verified) "
+        "VALUES ($1, $2, $3, $4, $5::boolean) "
+        "ON CONFLICT (supabase_id) DO UPDATE SET "
+        "email = EXCLUDED.email, "
+        "email_verified = EXCLUDED.email_verified, "
+        "full_name = COALESCE(users.full_name, EXCLUDED.full_name), "
+        "phone = COALESCE(users.phone, EXCLUDED.phone), "
+        "updated_at = NOW() "
+        "RETURNING id, email, full_name, phone, avatar_url, email_verified, created_at";
+    const char *upsert_params[] = { user_id, email, full_name, phone, email_verified };
+
+    PGresult *result = db_exec_params(conn, upsert_query, 5, upsert_params);
 
     if (!db_result_ok(result) || !db_result_has_rows(result)) {
         PQclear(result);
-
-        /* Auto-create user profile if not found */
-        AuthContext *auth = auth_get_context(req);
-        const char *email = (auth != NULL) ? auth->email : NULL;
-
-        const char *upsert_query =
-            "INSERT INTO users (supabase_id, email, email_verified) "
-            "VALUES ($1, $2, false) "
-            "ON CONFLICT (supabase_id) DO UPDATE SET email = EXCLUDED.email "
-            "RETURNING id, email, full_name, phone, avatar_url, email_verified, created_at";
-        const char *upsert_params[] = { user_id, email };
-
-        result = db_exec_params(conn, upsert_query, 2, upsert_params);
-
-        if (!db_result_ok(result) || !db_result_has_rows(result)) {
-            PQclear(result);
-            db_pool_release(pool, conn);
-            http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to create user profile");
-            return;
-        }
-
-        LOG_INFO("Auto-created profile for user: %s", user_id);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to load user profile");
+        return;
     }
-
     DbRow row = { .result = result, .row = 0 };
 
     cJSON *data = cJSON_CreateObject();
@@ -160,4 +154,49 @@ void handler_user_profile_update(HttpRequest *req, HttpResponse *resp, void *use
     free(json);
 
     LOG_INFO("Profile updated for user: %s", user_id);
+}
+
+void handler_user_profile_delete(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *user_id = auth_get_user_id(req);
+
+    if (user_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_UNAUTHORIZED, "Authentication required");
+        return;
+    }
+
+    int delete_result = supabase_delete_user_admin(user_id);
+    if (delete_result == -2) {
+        http_response_error(resp, HTTP_STATUS_SERVICE_UNAVAILABLE,
+                            "Account deletion is not configured on the server");
+        return;
+    }
+
+    if (delete_result != 0) {
+        http_response_error(resp, HTTP_STATUS_BAD_GATEWAY,
+                            "Failed to delete account from authentication provider");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    const char *delete_query = "DELETE FROM users WHERE id = $1 OR supabase_id = $1";
+    const char *params[] = { user_id };
+    PGresult *result = db_exec_params(conn, delete_query, 1, params);
+
+    if (!db_result_ok(result)) {
+        PQclear(result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to delete account data");
+        return;
+    }
+
+    PQclear(result);
+    db_pool_release(pool, conn);
+
+    http_response_success(resp, "{\"message\":\"Account deleted\"}");
 }

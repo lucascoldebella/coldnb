@@ -23,6 +23,7 @@ import Categories from "@/components/modals/Categories";
 import { ThemeProvider } from "@/context/ThemeContext";
 import AccountSidebar from "@/components/modals/AccountSidebar";
 import { Toaster } from "react-hot-toast";
+import CookieConsent from "@/components/common/CookieConsent";
 
 export default function RootLayout({ children }) {
   const pathname = usePathname();
@@ -157,6 +158,7 @@ export default function RootLayout({ children }) {
             <Categories />
             <AccountSidebar />
             <Toaster position="top-right" />
+            <CookieConsent />
             </UserAuthProvider>
           </LanguageProvider>
           </ThemeProvider>

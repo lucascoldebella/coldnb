@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { buildApiUrl } from "@/lib/apiBase";
 export default function NewsLetterModal() {
   const { t } = useLanguage();
   const pathname = usePathname();
@@ -32,6 +33,7 @@ export default function NewsLetterModal() {
   }, [pathname]);
   const [success, setSuccess] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const handleShowMessage = () => {
     setShowMessage(true);
     setTimeout(() => {
@@ -39,17 +41,28 @@ export default function NewsLetterModal() {
     }, 2000);
   };
   const sendEmail = async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
+    if (submitting) return;
     const email = e.target.email.value;
-
-    // TODO: Replace with your own newsletter service API
-    // External Brevo API disabled - configure your own service
-    console.log("Newsletter signup (configure your service):", email);
-    
-    // Simulate success for UI demonstration
-    e.target.reset();
-    setSuccess(true);
-    handleShowMessage();
+    setSubmitting(true);
+    try {
+      const res = await fetch(buildApiUrl("/api/newsletter/subscribe"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setSuccess(true);
+        e.target.reset();
+      } else {
+        setSuccess(false);
+      }
+    } catch {
+      setSuccess(false);
+    } finally {
+      setSubmitting(false);
+      handleShowMessage();
+    }
   };
 
   return (

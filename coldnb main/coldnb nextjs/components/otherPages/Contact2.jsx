@@ -1,12 +1,14 @@
 "use client";
 import React, { useRef, useState } from "react";
-import emailjs from "@emailjs/browser";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
+import { buildApiUrl } from "@/lib/apiBase";
 export default function Contact2() {
   const { t } = useLanguage();
   const formRef = useRef();
   const [success, setSuccess] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
 
   const handleShowMessage = () => {
     setShowMessage(true);
@@ -15,26 +17,33 @@ export default function Contact2() {
     }, 2000);
   };
 
-  const sendMail = (e) => {
+  const sendMail = async (e) => {
     e.preventDefault();
-    emailjs
-      .sendForm("service_noj8796", "template_fs3xchn", formRef.current, {
-        publicKey: "iG4SCmR-YtJagQ4gV",
-      })
-      .then((res) => {
-        if (res.status === 200) {
-          setSuccess(true);
-          handleShowMessage();
-
-          formRef.current.reset();
-        } else {
-          setSuccess(false);
-          handleShowMessage();
-        }
-      })
-      .catch((err) => {
-        console.log(err);
+    if (submitting) return;
+    const form = formRef.current;
+    setSubmitting(true);
+    try {
+      const res = await fetch(buildApiUrl("/api/contact"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name.value,
+          email: form.email.value,
+          message: form.message.value,
+        }),
       });
+      if (res.ok) {
+        setSuccess(true);
+        form.reset();
+      } else {
+        setSuccess(false);
+      }
+    } catch {
+      setSuccess(false);
+    } finally {
+      setSubmitting(false);
+      handleShowMessage();
+    }
   };
   return (
     <section className="flat-spacing">

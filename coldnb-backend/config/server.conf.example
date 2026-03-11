@@ -19,6 +19,7 @@ database.pool_size=10
 supabase.project_url=https://your-project.supabase.co
 supabase.jwt_secret_file=/etc/coldnb/secrets/jwt_secret
 supabase.anon_key_file=/etc/coldnb/secrets/supabase_anon_key
+supabase.service_role_key_file=/etc/coldnb/secrets/supabase_service_role_key
 
 # Admin authentication (separate from Supabase)
 admin.jwt_secret_file=/etc/coldnb/secrets/admin_jwt_secret
@@ -32,6 +33,17 @@ stripe.pix_enabled=true
 # Brevo (newsletter)
 brevo.api_key_file=/etc/coldnb/secrets/brevo_api_key
 brevo.list_id=1
+brevo.sandbox_mode=false
+
+# Transactional email (Brevo API)
+email.store_name=Coldnb
+email.site_url=https://coldnb.com
+email.sender_email=noreply@coldnb.com
+email.sender_name=Coldnb
+email.reply_to_email=support@coldnb.com
+email.reply_to_name=Coldnb Support
+email.notification_email=support@coldnb.com
+email.notification_name=Coldnb Support
 
 # File uploads
 upload.path=/var/www/coldnb/uploads
