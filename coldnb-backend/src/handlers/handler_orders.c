@@ -35,7 +35,7 @@ void handler_orders_register(HttpRouter *router, DbPool *pool) {
 }
 
 void handler_orders_track_register(HttpRouter *router, DbPool *pool) {
-    ROUTE_GET(router, "/api/orders/track", handler_orders_track, pool);
+    ROUTE_GET(router, "/api/track-order", handler_orders_track, pool);
 }
 
 void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data) {

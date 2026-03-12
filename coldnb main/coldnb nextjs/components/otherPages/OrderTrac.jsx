@@ -40,7 +40,7 @@ export default function OrderTrac() {
     try {
       const baseUrl = getApiBaseUrl();
       const res = await fetch(
-        `${baseUrl}/api/orders/track?order_number=${encodeURIComponent(orderNumber.trim())}&email=${encodeURIComponent(email.trim())}`
+        `${baseUrl}/api/track-order?order_number=${encodeURIComponent(orderNumber.trim())}&email=${encodeURIComponent(email.trim())}`
       );
       const data = await res.json();
 
