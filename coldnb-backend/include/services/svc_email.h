@@ -42,6 +42,15 @@ typedef struct {
     const char *status;
 } EmailOrderStatusUpdate;
 
+typedef struct {
+    const char *order_number;
+    const char *customer_email;
+    const char *customer_name;
+    const char *tracking_number;
+    const char *carrier;
+    const char *estimated_delivery;
+} EmailOrderShipped;
+
 int email_service_init(const EmailServiceConfig *config);
 void email_service_shutdown(void);
 bool email_service_is_initialized(void);
@@ -50,5 +59,6 @@ int email_service_send_contact_notification(const EmailContactSubmission *submis
 int email_service_send_order_confirmation(const EmailOrderCreated *order);
 int email_service_send_internal_order_notification(const EmailOrderCreated *order);
 int email_service_send_order_status_update(const EmailOrderStatusUpdate *update);
+int email_service_send_order_shipped(const EmailOrderShipped *shipped);
 
 #endif /* COLDNB_SVC_EMAIL_H */

@@ -307,6 +307,7 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     handler_products_register(router, pool);
     handler_newsletter_register(router, pool);
     handler_contact_register(router, pool);
+    handler_orders_track_register(router, pool);
 
     /* Apply auth middleware to protected paths */
     http_router_use_path(router, "/api/cart", auth_middleware_required, NULL);

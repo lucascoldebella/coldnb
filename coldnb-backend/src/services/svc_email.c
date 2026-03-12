@@ -390,6 +390,120 @@ int email_service_send_internal_order_notification(const EmailOrderCreated *orde
     return result;
 }
 
+int email_service_send_order_shipped(const EmailOrderShipped *shipped) {
+    if (!email_state.initialized || shipped == NULL || str_is_empty(shipped->customer_email)) {
+        return -1;
+    }
+
+    char *orders_link = orders_url();
+    char *safe_name = str_escape_html(shipped->customer_name ? shipped->customer_name : "Customer");
+    char *safe_tracking = str_escape_html(shipped->tracking_number ? shipped->tracking_number : "");
+    char *safe_carrier = str_escape_html(shipped->carrier ? shipped->carrier : "");
+
+    /* Build tracking URL based on carrier */
+    char *tracking_link = NULL;
+    if (!str_is_empty(shipped->tracking_number) && !str_is_empty(shipped->carrier)) {
+        if (strcasecmp(shipped->carrier, "correios") == 0 ||
+            strcasecmp(shipped->carrier, "sedex") == 0 ||
+            strcasecmp(shipped->carrier, "pac") == 0) {
+            tracking_link = str_printf(
+                "https://www.linkcorreios.com.br/?id=%s", shipped->tracking_number);
+        }
+    }
+
+    char *delivery_section = "";
+    bool free_delivery = false;
+    if (!str_is_empty(shipped->estimated_delivery)) {
+        delivery_section = str_printf(
+            "<li><strong>Estimated delivery:</strong> %s</li>",
+            shipped->estimated_delivery);
+        free_delivery = true;
+    }
+
+    char *tracking_button = "";
+    bool free_tracking_button = false;
+    if (tracking_link != NULL) {
+        tracking_button = str_printf(
+            "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;"
+            "background:#111827;color:#ffffff;text-decoration:none;"
+            "border-radius:6px\">Track my package</a></p>",
+            tracking_link);
+        free_tracking_button = true;
+    }
+
+    char *subject = str_printf("%s order shipped %s",
+                               email_state.store_name,
+                               shipped->order_number ? shipped->order_number : "");
+    char *text_body = str_printf(
+        "Hello %s,\n\n"
+        "Your order %s has been shipped!\n"
+        "Carrier: %s\n"
+        "Tracking number: %s\n"
+        "%s%s"
+        "\nYou can review your orders here: %s\n\n"
+        "%s\n",
+        shipped->customer_name ? shipped->customer_name : "Customer",
+        shipped->order_number ? shipped->order_number : "-",
+        shipped->carrier ? shipped->carrier : "-",
+        shipped->tracking_number ? shipped->tracking_number : "-",
+        !str_is_empty(shipped->estimated_delivery) ? "Estimated delivery: " : "",
+        !str_is_empty(shipped->estimated_delivery) ? shipped->estimated_delivery : "",
+        orders_link ? orders_link : email_state.site_url,
+        email_state.store_name);
+    char *html_body = str_printf(
+        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
+        "<h2 style=\"margin:0 0 16px\">Your order has been shipped!</h2>"
+        "<p>Hello %s,</p>"
+        "<p>Your order <strong>%s</strong> is on its way.</p>"
+        "<ul>"
+        "<li><strong>Carrier:</strong> %s</li>"
+        "<li><strong>Tracking number:</strong> %s</li>"
+        "%s"
+        "</ul>"
+        "%s"
+        "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;"
+        "background:#6b7280;color:#ffffff;text-decoration:none;"
+        "border-radius:6px;margin-top:8px\">View my orders</a></p>"
+        "<p>%s</p>"
+        "</body></html>",
+        safe_name ? safe_name : "Customer",
+        shipped->order_number ? shipped->order_number : "-",
+        !str_is_empty(safe_carrier) ? safe_carrier : "-",
+        !str_is_empty(safe_tracking) ? safe_tracking : "-",
+        delivery_section,
+        tracking_button,
+        orders_link ? orders_link : email_state.site_url,
+        email_state.store_name);
+
+    BrevoEmailRequest request = {
+        .sender_email = email_state.sender_email,
+        .sender_name = email_state.sender_name,
+        .reply_to_email = email_state.reply_to_email,
+        .reply_to_name = email_state.reply_to_name,
+        .to_email = shipped->customer_email,
+        .to_name = shipped->customer_name,
+        .subject = subject,
+        .html_content = html_body,
+        .text_content = text_body,
+        .tag = "order-shipped"
+    };
+
+    int result = email_send(&request);
+
+    free(orders_link);
+    free(safe_name);
+    free(safe_tracking);
+    free(safe_carrier);
+    free(tracking_link);
+    if (free_delivery) free(delivery_section);
+    if (free_tracking_button) free(tracking_button);
+    free(subject);
+    free(text_body);
+    free(html_body);
+
+    return result;
+}
+
 int email_service_send_order_status_update(const EmailOrderStatusUpdate *update) {
     if (!email_state.initialized || update == NULL || str_is_empty(update->customer_email)) {
         return -1;

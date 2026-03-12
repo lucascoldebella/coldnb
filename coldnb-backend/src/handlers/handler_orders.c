@@ -34,6 +34,10 @@ void handler_orders_register(HttpRouter *router, DbPool *pool) {
     ROUTE_GET(router, "/api/orders/:id", handler_orders_get, pool);
 }
 
+void handler_orders_track_register(HttpRouter *router, DbPool *pool) {
+    ROUTE_GET(router, "/api/orders/track", handler_orders_track, pool);
+}
+
 void handler_orders_create(HttpRequest *req, HttpResponse *resp, void *user_data) {
     DbPool *pool = (DbPool *)user_data;
     const char *user_id = auth_get_user_id(req);
@@ -604,7 +608,8 @@ void handler_orders_get(HttpRequest *req, HttpResponse *resp, void *user_data) {
         "o.shipping_name, o.shipping_phone, o.shipping_street, o.shipping_street_2, "
         "o.shipping_city, o.shipping_state, o.shipping_postal_code, o.shipping_country, "
         "o.subtotal, o.shipping_cost, o.tax_amount, o.discount_amount, o.discount_code, "
-        "o.total, o.notes, o.created_at, o.paid_at, o.shipped_at, o.delivered_at "
+        "o.total, o.notes, o.created_at, o.paid_at, o.shipped_at, o.delivered_at, "
+        "o.tracking_number, o.carrier, o.estimated_delivery_date "
         "FROM orders o "
         "JOIN users u ON o.user_id = u.id "
         "WHERE o.id = $1 AND (u.id = $2 OR u.supabase_id = $2)";
@@ -654,6 +659,88 @@ void handler_orders_get(HttpRequest *req, HttpResponse *resp, void *user_data) {
     }
     PQclear(history_result);
 
+    db_pool_release(pool, conn);
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+}
+
+void handler_orders_track(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+
+    const char *order_number = http_request_get_query_param(req, "order_number");
+    const char *email = http_request_get_query_param(req, "email");
+
+    if (str_is_empty(order_number) || str_is_empty(email)) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "order_number and email are required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    /* Look up order by order_number + customer email for privacy */
+    const char *order_query =
+        "SELECT o.id, o.order_number, o.status, o.payment_status, "
+        "o.shipping_city, o.shipping_state, "
+        "o.subtotal, o.shipping_cost, o.discount_amount, o.total, "
+        "o.created_at, o.shipped_at, o.delivered_at, "
+        "o.tracking_number, o.carrier, o.estimated_delivery_date, "
+        "(SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS item_count "
+        "FROM orders o "
+        "JOIN users u ON o.user_id = u.id "
+        "WHERE o.order_number = $1 AND LOWER(u.email) = LOWER($2)";
+    const char *params[] = { order_number, email };
+
+    PGresult *order_result = db_exec_params(conn, order_query, 2, params);
+
+    if (!db_result_ok(order_result) || !db_result_has_rows(order_result)) {
+        PQclear(order_result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND,
+                           "Order not found. Please check your order number and email.");
+        return;
+    }
+
+    DbRow order_row = { .result = order_result, .row = 0 };
+    cJSON *data = db_row_to_json(&order_row);
+    const char *order_id = db_row_get_string(&order_row, "id");
+    char *order_id_copy = str_dup(order_id);
+    PQclear(order_result);
+
+    /* Get order items (limited info for privacy) */
+    const char *items_query =
+        "SELECT product_name, product_image, quantity, unit_price, total_price "
+        "FROM order_items WHERE order_id = $1 ORDER BY id";
+    const char *items_params[] = { order_id_copy };
+    PGresult *items_result = db_exec_params(conn, items_query, 1, items_params);
+
+    if (db_result_ok(items_result)) {
+        cJSON_AddItemToObject(data, "items", db_result_to_json(items_result));
+    }
+    PQclear(items_result);
+
+    /* Get order history */
+    const char *history_query =
+        "SELECT status, created_at "
+        "FROM order_history WHERE order_id = $1 "
+        "ORDER BY created_at ASC";
+    const char *history_params[] = { order_id_copy };
+    PGresult *history_result = db_exec_params(conn, history_query, 1, history_params);
+
+    if (db_result_ok(history_result)) {
+        cJSON_AddItemToObject(data, "history", db_result_to_json(history_result));
+    }
+    PQclear(history_result);
+
+    free(order_id_copy);
     db_pool_release(pool, conn);
 
     cJSON *response = json_create_success(data);

@@ -10,6 +10,9 @@ export const adminOrders = {
   updateStatus: (id, status) =>
     adminApi.put(`/api/admin/orders/${id}/status`, { status }),
 
+  updateTracking: (id, data) =>
+    adminApi.put(`/api/admin/orders/${id}/tracking`, data),
+
   updatePaymentStatus: (id, paymentStatus) =>
     adminApi.put(`/api/admin/orders/${id}/payment-status`, { paymentStatus }),
 

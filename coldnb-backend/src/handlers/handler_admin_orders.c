@@ -28,6 +28,7 @@ void handler_admin_orders_register(HttpRouter *router, DbPool *pool) {
     ROUTE_GET(router, "/api/admin/orders", handler_admin_orders_list, pool);
     ROUTE_GET(router, "/api/admin/orders/:id", handler_admin_orders_get, pool);
     ROUTE_PUT(router, "/api/admin/orders/:id/status", handler_admin_orders_update_status, pool);
+    ROUTE_PUT(router, "/api/admin/orders/:id/tracking", handler_admin_orders_update_tracking, pool);
 
     ROUTE_GET(router, "/api/admin/users", handler_admin_users_list, pool);
     ROUTE_GET(router, "/api/admin/users/:id", handler_admin_users_get, pool);
@@ -435,6 +436,173 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
     free(customer_name);
     free(status_copy);
     free(notes_copy);
+}
+
+void handler_admin_orders_update_tracking(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *order_id = http_request_get_path_param(req, "id");
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    if (order_id == NULL || !uuid_validate(order_id)) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid order ID");
+        return;
+    }
+
+    cJSON *body = json_parse(req->body);
+    if (body == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid JSON");
+        return;
+    }
+
+    const char *tracking_number = json_get_string(body, "tracking_number", NULL);
+    const char *carrier = json_get_string(body, "carrier", NULL);
+    const char *estimated_delivery = json_get_string(body, "estimated_delivery", NULL);
+
+    if (str_is_empty(tracking_number)) {
+        cJSON_Delete(body);
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "tracking_number is required");
+        return;
+    }
+
+    char *tracking_copy = str_dup(tracking_number);
+    char *carrier_copy = carrier ? str_dup(carrier) : NULL;
+    char *delivery_copy = estimated_delivery ? str_dup(estimated_delivery) : NULL;
+
+    cJSON_Delete(body);
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        free(tracking_copy);
+        free(carrier_copy);
+        free(delivery_copy);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    if (!db_begin(conn)) {
+        db_pool_release(pool, conn);
+        free(tracking_copy);
+        free(carrier_copy);
+        free(delivery_copy);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Transaction failed");
+        return;
+    }
+
+    /* Update tracking info and set status to shipped */
+    const char *update_query =
+        "UPDATE orders SET tracking_number = $1, carrier = $2, "
+        "estimated_delivery_date = $3, "
+        "status = 'shipped', shipped_at = NOW(), updated_at = NOW() "
+        "WHERE id = $4 "
+        "RETURNING order_number";
+    const char *update_params[] = { tracking_copy, carrier_copy, delivery_copy, order_id };
+    PGresult *update_result = db_exec_params(conn, update_query, 4, update_params);
+
+    if (!db_result_ok(update_result) || !db_result_has_rows(update_result)) {
+        PQclear(update_result);
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        free(tracking_copy);
+        free(carrier_copy);
+        free(delivery_copy);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Order not found");
+        return;
+    }
+
+    const char *order_number = db_result_value(update_result);
+    char *order_num_copy = str_dup(order_number);
+    PQclear(update_result);
+
+    /* Get customer info for email */
+    const char *notify_query =
+        "SELECT u.email, u.full_name "
+        "FROM orders o "
+        "LEFT JOIN users u ON o.user_id = u.id "
+        "WHERE o.id = $1";
+    const char *notify_params[] = { order_id };
+    PGresult *notify_result = db_exec_params(conn, notify_query, 1, notify_params);
+    char *customer_email = NULL;
+    char *customer_name = NULL;
+    if (db_result_ok(notify_result) && db_result_has_rows(notify_result)) {
+        DbRow notify_row = { .result = notify_result, .row = 0 };
+        const char *email_value = db_row_get_string(&notify_row, "email");
+        const char *name_value = db_row_get_string(&notify_row, "full_name");
+        customer_email = email_value ? str_dup(email_value) : NULL;
+        customer_name = name_value ? str_dup(name_value) : NULL;
+    }
+    PQclear(notify_result);
+
+    /* Add history entry */
+    AuthContext *auth = auth_get_context(req);
+    const char *admin_id = auth ? auth->user_id : NULL;
+    char *history_note = str_printf("Shipped via %s, tracking: %s",
+                                     carrier_copy ? carrier_copy : "Unknown",
+                                     tracking_copy);
+    const char *history_query =
+        "INSERT INTO order_history (order_id, status, notes, created_by) "
+        "VALUES ($1, 'shipped', $2, $3)";
+    const char *history_params[] = { order_id, history_note, admin_id };
+    PGresult *history_result = db_exec_params(conn, history_query, 3, history_params);
+    PQclear(history_result);
+
+    if (!db_commit(conn)) {
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        free(tracking_copy);
+        free(carrier_copy);
+        free(delivery_copy);
+        free(order_num_copy);
+        free(customer_email);
+        free(customer_name);
+        free(history_note);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to update tracking");
+        return;
+    }
+    db_pool_release(pool, conn);
+
+    /* Build response */
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddStringToObject(data, "order_number", order_num_copy);
+    cJSON_AddStringToObject(data, "tracking_number", tracking_copy);
+    if (carrier_copy) cJSON_AddStringToObject(data, "carrier", carrier_copy);
+    if (delivery_copy) cJSON_AddStringToObject(data, "estimated_delivery", delivery_copy);
+    cJSON_AddStringToObject(data, "status", "shipped");
+    cJSON_AddStringToObject(data, "message", "Tracking info updated and customer notified");
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+
+    /* Send shipped email (after response) */
+    EmailOrderShipped shipped_email = {
+        .order_number = order_num_copy,
+        .customer_email = customer_email,
+        .customer_name = customer_name,
+        .tracking_number = tracking_copy,
+        .carrier = carrier_copy,
+        .estimated_delivery = delivery_copy
+    };
+    if (email_service_send_order_shipped(&shipped_email) != 0) {
+        LOG_WARN("Shipped email failed for order %s", order_num_copy);
+    }
+
+    LOG_INFO("Order %s tracking updated: %s via %s", order_id, tracking_copy,
+             carrier_copy ? carrier_copy : "unknown");
+
+    free(tracking_copy);
+    free(carrier_copy);
+    free(delivery_copy);
+    free(order_num_copy);
+    free(customer_email);
+    free(customer_name);
+    free(history_note);
 }
 
 void handler_admin_users_list(HttpRequest *req, HttpResponse *resp, void *user_data) {

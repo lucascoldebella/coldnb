@@ -83,6 +83,14 @@ const TeamIcon = () => (
   </svg>
 );
 
+const InventoryIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+    <line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);
+
 const ShippingIcon = () => (
   <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="1" y="3" width="15" height="13" />
@@ -125,6 +133,7 @@ export default function AdminSidebar() {
         { path: "/admin/main-page", label: "Main Page", icon: HomepageIcon, section: "homepage" },
         { path: "/admin/products", label: "Products", icon: ProductsIcon, section: "products" },
         { path: "/admin/categories", label: "Categories", icon: CategoriesIcon, section: "products" },
+        { path: "/admin/inventory", label: "Inventory", icon: InventoryIcon, section: "products" },
         { path: "/admin/orders", label: "Orders", icon: OrdersIcon, section: "orders" },
         { path: "/admin/shipping", label: "Shipping", icon: ShippingIcon, section: "shipping" },
         { path: "/admin/customers", label: "Customers", icon: CustomersIcon, section: "customers" },

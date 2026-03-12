@@ -18,6 +18,9 @@ void handler_admin_orders_get(HttpRequest *req, HttpResponse *resp, void *user_d
 /* PUT /api/admin/orders/:id/status - Update order status */
 void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, void *user_data);
 
+/* PUT /api/admin/orders/:id/tracking - Update tracking info */
+void handler_admin_orders_update_tracking(HttpRequest *req, HttpResponse *resp, void *user_data);
+
 /* GET /api/admin/users - List users */
 void handler_admin_users_list(HttpRequest *req, HttpResponse *resp, void *user_data);
 

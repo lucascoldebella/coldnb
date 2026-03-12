@@ -1,103 +1,71 @@
 # Active Context — Coldnb
 
 ## Current Development Focus
-**Sprint 1 — Production Readiness** (started 2026-03-10)
-Goal: make the store capable of taking real orders and real payments.
+**Sprint 2 — Order Operations & Tracking** (completed 2026-03-11)
+Goal: operational readiness for order fulfillment post-launch.
 
-## Sprint 1 Scope & Task Breakdown
+## Sprint 2 Completed Tasks (2026-03-11)
 
-### P0.A — Stripe Payment Integration ✅ (completed 2026-03-10)
-**Backend (already existed):**
-- [x] `POST /api/payments/create-intent` — creates Stripe PaymentIntent with `automatic_payment_methods` (card + PIX)
-- [x] `POST /api/payments/pix` — creates PIX-specific payment with QR code
-- [x] `POST /api/webhooks/stripe` — handles `payment_intent.succeeded` → `paid`/`confirmed` and `payment_intent.payment_failed` → `failed`
-- [x] `client_stripe.c` — full Stripe client with HMAC-SHA256 webhook verification
+### P0: Order Tracking Page ✅
+- [x] Backend: `GET /api/orders/track?order_number=X&email=Y` (public, no auth)
+- [x] Backend: Queries by order_number + email for privacy
+- [x] Frontend: `OrderTrac.jsx` fully rewritten — form submits to API, shows visual status timeline (pending→confirmed→processing→shipped→delivered), tracking info (carrier, number, est. delivery), order items, order summary, status history
+- [x] i18n: 30+ new keys in both pt.json + en.json (orderTracking.status.*, carrier, trackingInfo, etc.)
+- [x] Carrier URL auto-link (Correios, DHL)
 
-**Frontend (completed 2026-03-10):**
-- [x] Installed `@stripe/react-stripe-js` + `@stripe/stripe-js`
-- [x] Rewrote `Checkout.jsx` — two-step flow: address form → Stripe `<PaymentElement>` (auto-shows card + PIX)
-- [x] Flow: save address → create order → create payment intent → confirm payment → redirect to order details
-- [x] Added 11 i18n keys for payment states (pt.json + en.json)
-- [x] Enabled Stripe config in `server.conf` (PIX enabled)
-- [ ] **VPS TODO:** Add `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` to VPS `.env.local`, configure Stripe secrets, uncomment Stripe in VPS `server.conf`, set up webhook URL in Stripe Dashboard
+### P0: Admin Tracking Number Upload ✅
+- [x] Backend: `PUT /api/admin/orders/:id/tracking` — sets tracking_number, carrier, estimated_delivery_date, auto-updates status to "shipped", auto-sets shipped_at, sends shipped email
+- [x] Backend: `email_service_send_order_shipped()` — HTML email with carrier info, tracking link (Correios auto-URL), estimated delivery
+- [x] Frontend: Admin order detail page (`/admin/orders/[id]`) — new "Tracking" card with carrier dropdown, tracking number input, est. delivery date picker, "Save & Notify" button
+- [x] DB migration 006: Added `tracking_number`, `carrier`, `estimated_delivery_date` to orders table
 
-### P0.B — Frontend Product Data from Database ✅ (already implemented)
-- [x] `GET /api/products` returns correct schema with pagination, filtering, sorting
-- [x] `GET /api/products/:id` returns full product detail (supports ID or slug)
-- [x] Shop page (`Products1.jsx`) uses `getProducts()` from `lib/shopApi.js` → API fetch
-- [x] Product detail page (`product-detail/[id]/page.jsx`) fetches from API
-- [x] Homepage (`page.jsx`) fetches from `GET /api/homepage` with fallback
-- [x] `lib/shopApi.js` has `transformProduct()` mapping backend → frontend shape
-- [x] `data/products.js` kept for non-production demo pages only
+### P0: Admin Inventory Management ✅
+- [x] New page: `/admin/inventory` — full inventory dashboard
+- [x] Stats cards: total products, out of stock (red), low stock ≤10 (orange), total units, inventory value
+- [x] Filters: stock level (all/out/low/in), category, search by name/SKU, sort options
+- [x] Inline stock editing: click "Edit Stock" → type new value → Save
+- [x] Added "Inventory" nav item to admin sidebar with box icon
 
-### P0.C — Cart Merge on Login ✅ (completed 2026-03-10)
-- [x] Added `cartApi` to `lib/userApi.js` (get, add, update, remove, clear)
-- [x] In `UserAuthContext.jsx`: `mergeCartOnLogin()` on `SIGNED_IN` event:
-  1. Reads localStorage `cartList`, pushes each item to `POST /api/cart`
-  2. Fetches merged server cart via `GET /api/cart`
-  3. Transforms server items to frontend shape and updates Context `setCartProducts`
-  4. localStorage syncs automatically via Context's existing `useEffect`
-- [x] On `SIGNED_OUT`: cart stays in localStorage as-is (standard e-commerce behavior)
+### P1: Customer Detail Page ✅
+- [x] New page: `/admin/customers/[id]` — profile card (avatar/initials, name, email, phone, active/verified badges), customer stats (orders, total spent, avg order, member since), order history table with links to order detail
 
-### P1-Quick — Newsletter Wiring ✅ (completed 2026-03-10)
-- [x] `Footer1.jsx`: replaced `console.log` with `fetch` to `POST /api/newsletter/subscribe`
-- [x] `NewsLetterModal.jsx`: same replacement
-- [x] i18n keys already existed (`newsletter.success`, `newsletter.error`) — no new keys needed
+### P1: Product CRUD ✅ (already built, verified)
+- All CRUD operations working: create, edit, delete, image management, categories
 
-### P1-Quick — Contact Form Backend Wiring ✅ (completed 2026-03-10)
-- [x] `Contact1.jsx`: removed EmailJS; replaced with `fetch` to `POST /api/contact` + fixed field names (`name="text"` → `name="name"`, added `name="message"`)
-- [x] `Contact2.jsx` and `Contact3.jsx`: same EmailJS → fetch replacement
-- [x] Removed `@emailjs/browser` dependency from package.json
-- [x] i18n keys already existed (`contact.messageSent`, `contact.somethingWrong`) — no new keys needed
+### P2: Shipping Config ✅ (already built)
+- Full CRUD at `/admin/shipping` with distance-based zones
 
-### P1-Quick — LGPD Cookie Consent ✅ (completed 2026-03-10)
-- [x] Created `components/common/CookieConsent.jsx` — fixed bottom banner with Accept/Decline
-- [x] Stores consent in localStorage key `coldnb-cookie-consent`
-- [x] Added to `app/layout.js` (inside providers, after Toaster)
-- [x] Added i18n keys (`cookie.message`, `cookie.accept`, `cookie.decline`, `cookie.learnMore`) to both pt.json + en.json
-- [x] Links to `/term-of-use` (privacy policy page not yet created — tracked in open issues)
-
-## Sprint 1 Definition of Done
-- [x] A customer can add products to cart, proceed to checkout, pay with a real card, and receive a confirmation email
-- [x] Product prices and stock shown in the storefront come from the database
-- [x] Items in cart before login are preserved after login
-- [x] Newsletter and contact forms submit to backend (not console.log / EmailJS)
-- [x] Cookie consent banner is shown to new visitors
-- [ ] **VPS deployment pending:** Stripe secrets, env vars, webhook URL configuration
+## Sprint 1 Completed (2026-03-10)
+- [x] Stripe checkout (PaymentElement with card + PIX)
+- [x] Cart merge on login
+- [x] Cookie consent
+- [x] Newsletter + contact forms wired to backend
+- [x] Product data API-driven
 
 ## Current Platform State
 - **Frontend:** Live at https://coldnb.com (PM2, port 3000)
 - **Backend:** Live on VPS (systemd, port 8080 loopback)
-- **Email:** Brevo transactional live and verified (contact, order confirmation, status updates)
+- **Email:** Brevo transactional live (contact, order confirmation, status updates, **shipped**)
 - **Stripe:** Backend handlers complete (card + PIX); frontend checkout wired; VPS config pending
 - **Analytics:** Backend tracking active; admin analytics page live
 
-## Last Major Work Completed
-1. **Sprint 1 — Production Readiness (2026-03-10):** All P0 + P1 tasks completed locally:
-   - Stripe checkout (PaymentElement with card + PIX), cart merge on login, cookie consent
-   - Newsletter wired to backend, contact forms wired to backend, EmailJS removed
-   - Product data already wired from API (pre-existing), verified complete
-2. **Email system (2026-03-08):** Brevo transactional wired for contact, order creation, order status.
-3. **i18n completion:** 100+ customer-facing files translated (PT-BR + EN, 500+ keys).
+## VPS Deployment Checklist (Sprint 1 + 2 Go-Live)
+1. [ ] **DB migration 006:** Apply `sql/006_order_tracking.sql` on VPS PostgreSQL
+2. [ ] **Stripe publishable key:** Add `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...` to VPS `.env.local`
+3. [ ] **Stripe secret key:** Write to VPS `config/secrets/stripe_secret_key`
+4. [ ] **Stripe webhook secret:** Write to VPS `config/secrets/stripe_webhook_secret`
+5. [ ] **VPS server.conf:** Uncomment Stripe lines + set `stripe.pix_enabled=true`
+6. [ ] **Stripe Dashboard:** Enable PIX, add webhook endpoint
+7. [ ] **Nginx:** Ensure `/api/webhooks/stripe` proxied to backend :8080
+8. [ ] **Deploy:** Run `./scripts/deploy.sh`
+9. [ ] **Verify:** Test checkout with Stripe test card, verify webhook + tracking flow
 
-## VPS Deployment Checklist (Sprint 1 Go-Live)
-1. [ ] **Stripe publishable key:** Add `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...` to `/opt/coldnb/coldnb main/coldnb nextjs/.env.local`
-2. [ ] **Stripe secret key:** Write to `/opt/coldnb/coldnb-backend/config/secrets/stripe_secret_key`
-3. [ ] **Stripe webhook secret:** Write to `/opt/coldnb/coldnb-backend/config/secrets/stripe_webhook_secret`
-4. [ ] **VPS server.conf:** Uncomment Stripe lines + set `stripe.pix_enabled=true` in `/opt/coldnb/coldnb-backend/config/server.conf`
-5. [ ] **Stripe Dashboard:** Enable PIX (Settings → Payment methods → PIX)
-6. [ ] **Stripe Dashboard:** Add webhook endpoint `https://coldnb.com/api/webhooks/stripe` with events: `payment_intent.succeeded`, `payment_intent.payment_failed`
-7. [ ] **Nginx:** Ensure `/api/webhooks/stripe` is proxied to backend port 8080
-8. [ ] **Deploy:** Run `./scripts/deploy.sh` (pushes code, rebuilds backend, rebuilds frontend, restarts services)
-9. [ ] **Verify:** Test checkout with Stripe test card `4242 4242 4242 4242`, verify webhook fires
-
-## Known Open Issues (Non-Sprint-1)
+## Known Open Issues
 - `data/products.js` still used for non-production pages (cleanup in Sprint 3)
 - Google Maps shows New York placeholder coordinates
 - Placeholder contact info in `Footer1.jsx` (themesflat email, fake phone)
-- Order tracking page (`/order-tracking`) UI only — no backend connection
 - 17 unused homepage themes and 24 unused product detail variants inflate bundle
-- Privacy policy page (`/privacy-policy`) not yet created — cookie consent links to `/term-of-use`
+- Privacy policy page (`/privacy-policy`) not yet created
 
 ## In-Progress / Do Not Interrupt
 - Nothing currently in-progress
@@ -106,3 +74,4 @@ Goal: make the store capable of taking real orders and real payments.
 - Email split: Brevo API (backend business mail) vs Brevo SMTP via Supabase (auth mail) — permanent
 - `brevo.sandbox_mode=true` for safe email testing
 - Admin `/admin/email` page: operational reference only, future expansion point
+- Order tracking is public (no auth) — uses order_number + email for privacy verification
