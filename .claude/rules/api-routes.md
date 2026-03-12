@@ -10,8 +10,15 @@ HttpRouter *router = http_server_get_router(server);
 ROUTE_GET(router, "/api/products", handler_get_products, pool);
 ROUTE_POST(router, "/api/orders", handler_create_order, pool);
 ROUTE_PUT(router, "/api/admin/orders/:id/status", handler_admin_update_order_status, pool);
+ROUTE_PUT(router, "/api/admin/orders/:id/tracking", handler_admin_orders_update_tracking, pool);
+
+// Public (no auth) — registered BEFORE auth middleware
+ROUTE_GET(router, "/api/track-order", handler_orders_track, pool);
 ```
 Pattern: `ROUTE_<METHOD>(router, "path", handler_fn, ctx)`
+
+**IMPORTANT:** Public endpoints that would match an auth-protected prefix (e.g., `/api/orders/*`)
+must use an alternative path. See ADR-009 in `docs/decisions.md`.
 
 ## Handler Signature
 ```c

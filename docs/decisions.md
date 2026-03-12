@@ -122,3 +122,21 @@
 **Rationale:** Cost optimization; both projects are low-traffic at current stage.
 
 **Consequences:** Resource contention possible at scale; need to monitor memory usage; migration to separate droplets if either project grows significantly.
+
+---
+
+## ADR-009: Public Order Tracking Route at `/api/track-order`
+
+**Decision:** Register the public order tracking endpoint as `GET /api/track-order` instead of the more RESTful `GET /api/orders/track`.
+
+**Context:** The C backend uses path-prefix middleware registration: `http_router_use_path(router, "/api/orders", auth_middleware_required, NULL)`. This blocks ALL paths starting with `/api/orders`, including sub-routes like `/api/orders/track`, regardless of route registration order.
+
+**Rationale:**
+- Moving the route outside the `/api/orders` prefix avoids the auth middleware conflict without restructuring the middleware system
+- The alternative — rewriting the middleware to support route-level exclusions — was disproportionate effort for a single endpoint
+- Public access is required: customers track orders without logging in, using order_number + email for privacy verification
+
+**Consequences:**
+- Public tracking URL is `/api/track-order` (not under `/api/orders/`)
+- Any future public order-related endpoints must also avoid the `/api/orders` prefix
+- Frontend `OrderTrac.jsx` calls `/api/track-order` directly

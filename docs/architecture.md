@@ -46,7 +46,7 @@ Supabase ──▶ Brevo SMTP (auth emails: signup, reset, magic link)
 | Service | Purpose | Integration |
 |---------|---------|------------|
 | Supabase | Customer auth (signup, login, session management) | `@supabase/supabase-js` (frontend), JWT validation in `auth_supabase.c` (backend) |
-| Stripe | Payment processing | `client_stripe.c` — **partially implemented** |
+| Stripe | Payment processing (card + PIX) | `client_stripe.c` + `handler_stripe.c` — backend complete, VPS config pending |
 | Brevo (API) | Transactional business emails | `client_brevo.c` via HTTP API v3 |
 | Brevo (SMTP) | Auth emails (routed through Supabase) | Configured in Supabase dashboard |
 
@@ -74,18 +74,37 @@ Admin UI → Nginx → C Backend :8080
 
 ### Checkout → Order Flow
 ```
-Frontend: Cart → Checkout UI → POST /api/orders
-  ├── Backend: Create order record (status: pending)
+Frontend: Cart → Checkout UI → Stripe PaymentElement (card or PIX)
+  ├── Frontend: POST /api/orders → Backend creates order (status: pending)
   ├── Backend: Create order_items (product snapshot)
   ├── Backend: Apply discount code (if any)
-  ├── Backend: Send order confirmation email (customer + internal)
-  └── Backend: [TODO] Initiate Stripe payment → await webhook
-Stripe webhook → POST /api/stripe/webhook → Update order payment_status + status
+  ├── Backend: POST /api/stripe/create-payment-intent → Stripe PaymentIntent
+  ├── Frontend: Stripe confirms payment via PaymentElement
+  └── Stripe webhook → POST /api/webhooks/stripe → Update payment_status + order status
+Backend: Send order confirmation email (customer + internal)
 ```
+
+### Order Tracking Flow (Public, No Auth)
+```
+Customer: /order-tracking → Enter order_number + email
+  ├── Frontend: GET /api/track-order?order_number=X&email=Y
+  ├── Backend: Query by order_number + LOWER(email) match
+  └── Response: order details, items, status history, tracking info
+
+Admin: /admin/orders/[id] → Add tracking number
+  ├── Frontend: PUT /api/admin/orders/:id/tracking {tracking_number, carrier, estimated_delivery}
+  ├── Backend: Update orders table, set status=shipped, shipped_at=NOW()
+  ├── Backend: Create order_history entry
+  └── Backend: Send shipped email with tracking link (Correios/DHL auto-URL)
+```
+
+Note: The public tracking endpoint uses `/api/track-order` (NOT `/api/orders/track`)
+because `http_router_use_path(router, "/api/orders", auth_middleware)` blocks all paths
+starting with `/api/orders`, including any sub-routes.
 
 ### Email Flow
 ```
-Backend business event (contact, order, status update)
+Backend business event (contact, order, status update, shipped)
   └── svc_email.c (abstraction layer)
       └── client_brevo.c (HTTP API v3, xkeysib-... key)
           └── Brevo transactional delivery

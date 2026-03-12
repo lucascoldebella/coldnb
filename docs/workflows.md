@@ -22,6 +22,7 @@ psql -U coldnb -d coldnb -f coldnb-backend/sql/002_admin_permissions.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/003_homepage_content.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/004_shipping_zones.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/005_navigation_menus.sql
+psql -U coldnb -d coldnb -f coldnb-backend/sql/006_order_tracking.sql
 ```
 
 ### 3. Backend Setup

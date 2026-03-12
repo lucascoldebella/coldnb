@@ -65,7 +65,7 @@ coldnb/                              ← Project root
 │   │   ├── (products)/              ← 7+ shop listing layouts
 │   │   ├── (productDetails)/        ← 25+ product detail variants
 │   │   ├── (my-account)/            ← Customer account pages
-│   │   ├── (admin)/                 ← Admin dashboard pages
+│   │   ├── (admin)/                 ← Admin dashboard pages (orders, inventory, customers, analytics, etc.)
 │   │   ├── (other-pages)/           ← Cart, checkout, contact, auth pages
 │   │   ├── (blogs)/                 ← Blog pages
 │   │   ├── layout.js                ← Root layout (contexts, modals, Bootstrap init)
@@ -86,7 +86,7 @@ coldnb/                              ← Project root
     │   ├── middleware/              ← Rate limiting, analytics
     │   └── util/                    ← String, JSON, hash, UUID helpers
     ├── include/                     ← Header files (mirrors src/)
-    ├── sql/                         ← Database migrations (001-005)
+    ├── sql/                         ← Database migrations (001-006)
     ├── config/                      ← server.conf + secrets/ directory
     ├── scripts/                     ← Dev setup, production setup scripts
     ├── Makefile                     ← Build system
@@ -140,7 +140,9 @@ Supabase Auth → Brevo SMTP (auth emails: signup, reset)
 - Backend MUST run on loopback in production (127.0.0.1:8080) — never public
 - Two separate auth systems: Supabase JWT (customers) vs custom JWT (admins)
 - Two separate email paths: Brevo HTTP API (business) vs Brevo SMTP via Supabase (auth)
-- Frontend product browsing uses static `data/products.js`; backend is authoritative for inventory
+- Frontend product browsing is API-driven via `lib/shopApi.js` → `GET /api/products`
+- Public order tracking at `/api/track-order` (not `/api/orders/track` — see ADR-009)
+- Stripe checkout with PaymentElement (card + PIX) — VPS keys pending
 
 ---
 

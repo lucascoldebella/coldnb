@@ -7,7 +7,7 @@ applies_to: ["coldnb-backend/sql/**", "**/*.sql"]
 ## Migration File Conventions
 - Files live in `coldnb-backend/sql/`
 - Naming: `00N_description.sql` (sequential, 3-digit zero-padded)
-- Apply in order: 001 → 002 → 003 → 004 → 005
+- Apply in order: 001 → 002 → 003 → 004 → 005 → 006
 - **NEVER** modify an already-applied migration — create a new one instead
 
 ## Current Migrations (Applied Order)
@@ -16,6 +16,7 @@ applies_to: ["coldnb-backend/sql/**", "**/*.sql"]
 3. `003_homepage_content.sql` — Dynamic homepage content management tables
 4. `004_shipping_zones.sql` — Shipping zones, methods, and rules
 5. `005_navigation_menus.sql` — Dynamic navigation menu tables
+6. `006_order_tracking.sql` — Added `tracking_number`, `carrier`, `estimated_delivery_date` columns to orders table + tracking index
 
 ## Rules
 - **NEVER run migrations without explicit human confirmation**

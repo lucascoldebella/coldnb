@@ -1,6 +1,6 @@
 # Coldnb — Complete Codebase & Product Analysis
 
-> Generated: 2026-03-10 | Analyst: Context Engineering Session
+> Generated: 2026-03-10 | Updated: 2026-03-11 (Sprint 2 complete) | Analyst: Context Engineering Session
 
 ---
 
@@ -10,12 +10,14 @@ Coldnb is a full-stack jewelry e-commerce platform built for the Brazilian marke
 
 The platform demonstrates significant technical ambition — a custom C backend for performance, a mature dual-auth architecture, a comprehensive PostgreSQL schema covering the full e-commerce domain, and a production-ready deployment stack on DigitalOcean with Nginx, PM2, systemd, UFW, CrowdSec, and fail2ban. Email transactional flows (order confirmation, status updates, contact notifications) are live.
 
-However, the platform is **not yet production-ready** for real commerce. The three most critical gaps are: (1) **Stripe payment integration is incomplete** — the backend client exists but is unconfigured on VPS; (2) **frontend product browsing uses a 133KB static data file** disconnected from the live database, meaning inventory, pricing, and availability shown to customers are not real; (3) **cart is split between two unreconciled systems** (localStorage for guests, server-side for authenticated users) with no merge on login.
+As of Sprint 2 (2026-03-11), all three original P0 blockers have been resolved: (1) **Stripe payment integration is complete** — backend handlers, PaymentElement checkout (card + PIX), and webhook handling are built (VPS Stripe key config pending); (2) **frontend product browsing is API-driven** — shop/detail/homepage pages fetch from `/api/products`; (3) **cart merge on login** is implemented via `mergeCartOnLogin()` in UserAuthContext.
+
+Sprint 2 added order tracking (public tracking page + admin tracking upload + shipped email), admin inventory management, and admin customer detail pages.
 
 **Top 3 recommended next actions:**
-1. Complete and configure Stripe payment flow end-to-end (including webhook handling for order status automation)
-2. Connect frontend product listing and detail pages to `/api/products` backend endpoint (replace static `data/products.js` for dynamic data)
-3. Implement cart merge: reconcile localStorage cart with server-side cart on user login
+1. Configure Stripe live keys on VPS and verify end-to-end payment flow
+2. Implement SEO meta tags and sitemap generation for organic discovery
+3. Build guest checkout flow (schema supports `user_id NULL` on orders)
 
 ---
 
@@ -141,7 +143,7 @@ coldnb/
     │   ├── http/                ← http_server, http_router, http_request, http_response
     │   └── main.c               ← Entry point, route registration
     ├── include/                 ← Header files (mirrors src/)
-    ├── sql/                     ← 5 migration files (001–005)
+    ├── sql/                     ← 6 migration files (001–006)
     ├── config/                  ← server.conf + secrets/ directory
     ├── scripts/                 ← dev_setup.sh, setup_production.sh
     └── Makefile
@@ -397,8 +399,8 @@ sequenceDiagram
 | Supabase Auth | Customer identity, session management | ✅ Live | JWT validated in `auth_supabase.c`; email verified via Brevo SMTP relay |
 | Brevo API v3 | Transactional emails (order, contact) | ✅ Live | `xkeysib-...` key; contact + order flows verified on VPS |
 | Brevo SMTP | Auth email relay (signup, reset, magic link) | ✅ Configured | `xsmtpsib-...` via Supabase dashboard; conceptually separate from Brevo API |
-| Stripe | Payment processing | 🔄 Partial | `client_stripe.c` exists; not configured on VPS; checkout UI exists |
-| EmailJS | Contact form (legacy template integration) | ⚠️ Unconfigured | Still in Contact1/2/3.jsx; should be replaced by backend `/api/contact` |
+| Stripe | Payment processing (card + PIX) | ✅ Code complete | `client_stripe.c` + `handler_stripe.c` + PaymentElement; VPS keys pending |
+| EmailJS | Contact form (legacy — REMOVED) | ✅ Replaced | Contact1/2/3.jsx now use `POST /api/contact` backend endpoint |
 | Google Maps | Store location embeds | ⚠️ Placeholder | Shows New York coordinates; needs real store location |
 
 ---
@@ -409,8 +411,8 @@ sequenceDiagram
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Product listing pages | 🔄 Partial | UI complete (7+ layouts); uses static data file — not connected to DB |
-| Product detail pages | 🔄 Partial | UI complete (25+ variants); variant selection (color/size) works on static data |
+| Product listing pages | ✅ Done | UI complete (7+ layouts); API-driven via `lib/shopApi.js` |
+| Product detail pages | ✅ Done | UI complete (25+ variants); API-driven via `lib/shopApi.js` |
 | Category management | ✅ Done | Schema + backend handlers + admin UI |
 | Search functionality | ⬜ Not Started | No search; client-side filter on static data only |
 | Product recommendations | ⬜ Not Started | No related products logic |
@@ -422,7 +424,7 @@ sequenceDiagram
 |---------|--------|-------|
 | Add to cart, update quantity, remove | ✅ Done | localStorage cart fully functional in UI |
 | Server-side cart (authenticated) | ✅ Done | DB table + backend handlers; not synced with localStorage |
-| Cart merge on login | ⬜ Not Started | localStorage cart and server cart are separate; no merge |
+| Cart merge on login | ✅ Done | `mergeCartOnLogin()` in UserAuthContext reconciles localStorage → server on login |
 | Guest checkout | ⬜ Not Started | Schema supports NULL user_id on orders; UI flow not built |
 | Shipping address input & validation | ✅ Done | Checkout UI + user_addresses DB table |
 | Saved address management | ✅ Done | `/my-account-address` page + backend handlers |
@@ -435,9 +437,9 @@ sequenceDiagram
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Stripe integration | 🔄 Partial | `client_stripe.c` exists; not configured on VPS |
-| Credit/debit card processing | 🔄 Partial | Stripe UI elements not yet integrated in checkout |
-| PIX / Boleto (Brazilian market) | ⬜ Not Started | Stripe supports PIX; not implemented |
+| Stripe integration | ✅ Done | `client_stripe.c` + `handler_stripe.c` + PaymentElement frontend; VPS keys pending |
+| Credit/debit card processing | ✅ Done | Stripe PaymentElement integrated in checkout |
+| PIX / Boleto (Brazilian market) | ✅ Done | PIX enabled via Stripe PaymentElement |
 | Apple Pay / Google Pay | ⬜ Not Started | |
 | Payment failure handling | ⬜ Not Started | No retry flow |
 | Refunds | ⬜ Not Started | No refund workflow |
@@ -452,7 +454,7 @@ sequenceDiagram
 | Order history (customer) | ✅ Done | `/my-account-orders` + `/my-account-orders-details` |
 | Admin order dashboard | ✅ Done | List, filter, view orders in admin |
 | Admin order status updates | ✅ Done | `PUT /api/admin/orders/:id/status` + email notification |
-| Order tracking page | 🔄 Partial | `/order-tracking` UI exists; not connected to backend |
+| Order tracking page | ✅ Done | `/order-tracking` → `GET /api/track-order` with visual timeline, tracking info, items, history |
 | Order cancellation | 🔄 Partial | Status flow supports cancelled; no customer-initiated cancel UI |
 | Order editing | ⬜ Not Started | |
 
@@ -463,7 +465,7 @@ sequenceDiagram
 | Order confirmation email | ✅ Done | Sent on `POST /api/orders` via Brevo API |
 | Internal new-order alert | ✅ Done | Sent to `email@coldnb.com` on order creation |
 | Order status update email | ✅ Done | Sent to customer when admin updates status |
-| Shipping confirmation + tracking | ⬜ Not Started | No tracking number field or carrier integration |
+| Shipping confirmation + tracking | ✅ Done | `PUT /api/admin/orders/:id/tracking` → sets tracking info, sends shipped email with carrier URL |
 | Return/exchange workflow | ⬜ Not Started | |
 | Refund notification | ⬜ Not Started | |
 | Invoice/receipt PDF | ⬜ Not Started | |
@@ -499,14 +501,14 @@ sequenceDiagram
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Admin login | ✅ Done | `POST /api/admin/login`; Argon2id; custom JWT |
-| Product CRUD | 🔄 Partial | Schema + handlers exist; admin UI completeness unknown |
+| Product CRUD | ✅ Done | Full CRUD: create, edit, delete, image management, categories |
 | Image upload | ✅ Done | `POST /api/admin/upload` → `public/uploads/products/` |
 | Order management dashboard | ✅ Done | List, filter, status updates |
-| Customer management | 🔄 Partial | Page exists in admin sidebar; handler extent unknown |
+| Customer management | ✅ Done | List page + detail page (`/admin/customers/[id]`) with profile, stats, order history |
 | Coupon management | 🔄 Partial | Schema complete; admin CRUD UI extent unknown |
 | Analytics dashboard | ✅ Done | Revenue, orders, top products charts (Chart.js) |
 | Email operations page | ✅ Done | `/admin/email` — architecture reference, config display |
-| Inventory management (low stock) | ⬜ Not Started | `low_stock_threshold` in schema; no alerts or bulk update UI |
+| Inventory management (low stock) | ✅ Done | `/admin/inventory` — stats cards, filters, inline stock editing, color-coded badges |
 | Content management (homepage) | 🔄 Partial | `003_homepage_content.sql` exists; admin UI unknown |
 | Reporting exports | ⬜ Not Started | |
 
@@ -517,7 +519,7 @@ sequenceDiagram
 | Shipping zones schema | ✅ Done | `004_shipping_zones.sql` applied |
 | Shipping rate calculation | 🔄 Partial | `shipping_cost` field in orders; no real-time rate lookup |
 | Carrier integration (Correios) | ⬜ Not Started | |
-| Tracking number + tracking page | ⬜ Not Started | |
+| Tracking number + tracking page | ✅ Done | DB columns + admin upload + public tracking page + shipped email |
 | Shipping label generation | ⬜ Not Started | |
 | Free shipping threshold | 🔄 Partial | DB supports it; no UI enforcement logic |
 
@@ -528,7 +530,7 @@ sequenceDiagram
 | SEO-friendly slugs | ✅ Done | All products and categories have slug fields |
 | Meta tags / Open Graph | ⬜ Not Started | No meta tags on product pages |
 | Sitemap generation | ⬜ Not Started | |
-| Newsletter signup | 🔄 Partial | Frontend modal/footer logs to console; backend endpoint exists; not wired |
+| Newsletter signup | ✅ Done | Footer + modal → `POST /api/newsletter/subscribe` (Brevo sync) |
 | Abandoned cart recovery | ⬜ Not Started | |
 | Loyalty/rewards program | ⬜ Not Started | |
 
@@ -560,22 +562,16 @@ sequenceDiagram
 
 ## 9. Product Gaps & Recommendations
 
-### P0 — Blockers (Cannot launch without these)
+### P0 — Blockers (All Resolved as of Sprint 1, 2026-03-10)
 
-**P0.1 — Stripe Payment Integration**
-- **Missing:** Stripe is not configured on VPS. `client_stripe.c` exists but payment intent creation, confirmation, and webhook handling are incomplete. Customers cannot pay.
-- **Why it matters:** Zero revenue without payments.
-- **Suggestion:** Implement `POST /api/stripe/create-payment-intent`, integrate Stripe Elements in checkout frontend, add `POST /api/stripe/webhook` handler for `payment_intent.succeeded` → update order payment_status and status.
+**P0.1 — Stripe Payment Integration** ✅ RESOLVED
+- Full backend + frontend checkout with PaymentElement (card + PIX). Webhook handler at `POST /api/webhooks/stripe`. VPS Stripe key configuration pending.
 
-**P0.2 — Frontend Product Data from Database**
-- **Missing:** `data/products.js` (133KB static file) drives all customer-facing product browsing. Prices, stock levels, and availability displayed are not from the live database.
-- **Why it matters:** Store cannot launch with hardcoded, stale product data. Inventory management is impossible.
-- **Suggestion:** Replace static data lookups in product listing/detail pages with API calls to `GET /api/products` and `GET /api/products/:id`. Use Next.js dynamic data fetching patterns.
+**P0.2 — Frontend Product Data from Database** ✅ RESOLVED
+- Shop/detail/homepage pages are API-driven via `lib/shopApi.js` → `GET /api/products`.
 
-**P0.3 — Cart Merge on Login**
-- **Missing:** No reconciliation between localStorage cart (guest) and server-side cart (authenticated user). Items added before login are lost.
-- **Why it matters:** Poor UX destroys conversion — users add items then lose them when they log in.
-- **Suggestion:** On Supabase auth state change (login), read localStorage cart and POST each item to `/api/cart`, then clear localStorage and switch to server-side cart.
+**P0.3 — Cart Merge on Login** ✅ RESOLVED
+- `mergeCartOnLogin()` in UserAuthContext reconciles localStorage → server cart on Supabase auth state change.
 
 ### P1 — High Priority (Significant UX or business impact)
 
@@ -587,32 +583,29 @@ sequenceDiagram
 - **Missing:** Shipping cost is hardcoded or zero. No Correios/carrier integration.
 - **Suggestion:** Integrate Correios web service or a shipping aggregator for real-time rate lookup.
 
-**P1.3 — Newsletter Wiring**
-- **Missing:** Footer and modal newsletter signup logs to console only. Backend `/api/newsletter` endpoint exists and connects to Brevo.
-- **Suggestion:** Replace console.log with `POST /api/newsletter` call from `Footer1.jsx` and `NewsLetterModal.jsx`.
+**P1.3 — Newsletter Wiring** ✅ RESOLVED
+- Footer + modal → `POST /api/newsletter/subscribe` (Brevo sync).
 
-**P1.4 — Contact Form Backend Wiring**
-- **Missing:** `Contact1/2/3.jsx` use EmailJS (unconfigured). Backend `/api/contact` is live and sends real notifications.
-- **Suggestion:** Replace EmailJS calls with `POST /api/contact` via `adminApi` (or plain fetch).
+**P1.4 — Contact Form Backend Wiring** ✅ RESOLVED
+- `Contact1/2/3.jsx` now use `POST /api/contact` backend endpoint.
 
 **P1.5 — SEO Meta Tags**
 - **Missing:** No meta titles, descriptions, or Open Graph tags on product pages.
 - **Suggestion:** Use Next.js `generateMetadata()` on product and category pages.
 
-**P1.6 — LGPD Cookie Consent**
-- **Missing:** No cookie consent banner. Required for Brazilian LGPD compliance.
-- **Suggestion:** Add cookie consent component; defer analytics scripts until consent given.
+**P1.6 — LGPD Cookie Consent** ✅ RESOLVED
+- Cookie consent banner implemented with Accept/Decline, localStorage, bilingual.
 
 ### P2 — Medium Priority (Important, not launch-blocking)
 
-**P2.1 — Order Tracking Page**
-- Backend has order status; `/order-tracking` page exists as UI only. Wire to `GET /api/orders/:order_number`.
+**P2.1 — Order Tracking Page** ✅ RESOLVED (Sprint 2)
+- Full tracking page with visual timeline, tracking info, items, history. Public endpoint at `GET /api/track-order`.
 
 **P2.2 — Guest Checkout**
 - Schema supports `user_id NULL` on orders. Build the guest → order flow (no auth required for purchase).
 
-**P2.3 — Inventory Management UI**
-- `low_stock_threshold` in schema. Add low-stock alert dashboard widget and bulk stock update in admin.
+**P2.3 — Inventory Management UI** ✅ RESOLVED (Sprint 2)
+- Full dashboard at `/admin/inventory` with stats cards, filters, inline stock editing, color-coded badges.
 
 **P2.4 — Rich Email Templates**
 - Current Brevo emails are plain/minimal. Build branded HTML templates for order confirmation and status updates.
@@ -639,11 +632,11 @@ sequenceDiagram
 
 | Item | Location | Problem | Risk | Recommended Fix |
 |------|---------|---------|------|----------------|
-| Static product data | `data/products.js` | 133KB client bundle; disconnected from real inventory | Critical | Migrate product pages to API-driven data fetching |
-| Dual cart systems | `context/Context.jsx` + backend | No merge on login; split UX | High | Implement cart reconciliation on auth state change |
+| Static product data | `data/products.js` | 133KB file still kept for non-production demo pages | Medium | Delete once all pages use API-driven data |
+| ~~Dual cart systems~~ | ~~`context/Context.jsx` + backend~~ | ~~No merge on login~~ | ~~RESOLVED~~ | Cart merge implemented via `mergeCartOnLogin()` |
 | Dead homepage themes | `app/(homes)/` | 17 unused themes inflate bundle and maintenance burden | Medium | Delete all but the production homepage; keep only active theme |
 | Dead product detail variants | `app/(productDetails)/` | 24 unused variants inflate bundle | Medium | Audit which is in production use; delete rest |
-| EmailJS in contact forms | `components/otherPages/Contact*.jsx` | Unconfigured; backend endpoint exists | Medium | Replace with `POST /api/contact` |
+| ~~EmailJS in contact forms~~ | ~~`components/otherPages/Contact*.jsx`~~ | ~~RESOLVED~~ | ~~RESOLVED~~ | Contact forms now use `POST /api/contact` |
 | Placeholder data | `Footer1.jsx`, store location pages | "themesflat@gmail.com", New York coordinates | Medium | Replace with real contact info and store location |
 | `reducer/` directory | `coldnb main/coldnb nextjs/reducer/` | Empty; no reducers; dead directory | Low | Delete |
 | `utlis/` typo | `coldnb main/coldnb nextjs/utlis/` | Typo; all imports reference it; cannot rename without mass refactor | Low | Document; do not rename |
@@ -665,10 +658,10 @@ sequenceDiagram
 | CORS | ✅ Configured | Whitelist in server.conf (not wildcard) |
 | Use-after-free (JSON) | ✅ Fixed | Bug in 3 handlers fixed; copy strings before `cJSON_Delete()` |
 | `is_valid_path()` bug | ✅ Fixed | Broken `memchr` null-byte check removed |
-| LGPD / GDPR | ⬜ Not Started | No cookie consent banner; no data export; no deletion workflow |
+| LGPD / GDPR | 🔄 Partial | Cookie consent banner implemented; no data export; no deletion workflow |
 | Dependency scanning | ⬜ Not Started | No automated `npm audit` or C dependency auditing in CI |
 | SQL injection | ✅ Protected | Parameterized queries via libpq (`$1, $2, ...`) |
-| Stripe not configured | ⚠️ Warning | VPS logs Stripe warning at startup; not a security issue but a completeness gap |
+| Stripe | 🔄 VPS config pending | Backend code complete; VPS needs live keys configured before processing payments |
 
 **Critical Remediation Items:**
 1. Implement LGPD cookie consent before any real user data collection
@@ -729,6 +722,9 @@ gantt
 | Image upload API route | `coldnb main/coldnb nextjs/app/api/admin/upload/route.js` |
 | Admin sidebar navigation | `coldnb main/coldnb nextjs/components/admin/layout/AdminSidebar.jsx` |
 | Admin email page | `coldnb main/coldnb nextjs/app/(admin)/admin/email/page.jsx` |
+| Admin inventory page | `coldnb main/coldnb nextjs/app/(admin)/admin/inventory/page.jsx` |
+| Admin customer detail page | `coldnb main/coldnb nextjs/app/(admin)/admin/customers/[id]/page.jsx` |
+| Order tracking (public) | `coldnb main/coldnb nextjs/components/otherPages/OrderTrac.jsx` |
 | Cart modal | `coldnb main/coldnb nextjs/components/modals/CartModal.jsx` |
 | Cart utility trigger | `coldnb main/coldnb nextjs/utlis/openCartModal.js` |
 | Backend entry + route registration | `coldnb-backend/src/main.c` |
@@ -745,6 +741,7 @@ gantt
 | Supabase JWT validation | `coldnb-backend/src/auth/auth_supabase.c` |
 | DB connection pool | `coldnb-backend/src/db/db_connection.c` |
 | Rate limiting middleware | `coldnb-backend/src/middleware/middleware_rate_limit.c` |
+| Order tracking migration | `coldnb-backend/sql/006_order_tracking.sql` |
 | Initial database schema | `coldnb-backend/sql/001_initial_schema.sql` |
 | Admin permissions schema | `coldnb-backend/sql/002_admin_permissions.sql` |
 | Backend configuration | `coldnb-backend/config/server.conf` |
