@@ -14,6 +14,22 @@ ROUTE_PUT(router, "/api/admin/orders/:id/tracking", handler_admin_orders_update_
 
 // Public (no auth) — registered BEFORE auth middleware
 ROUTE_GET(router, "/api/track-order", handler_orders_track, pool);
+ROUTE_GET(router, "/api/discount-codes/check", handler_discounts_check, pool);  // validate code pre-checkout
+ROUTE_POST(router, "/api/guest-orders", handler_guest_orders_create, pool);     // guest checkout (no auth)
+
+// Customer-protected (Supabase JWT)
+ROUTE_PUT(router, "/api/orders/:id/cancel", handler_orders_cancel, pool);
+ROUTE_POST(router, "/api/returns", handler_returns_create, pool);
+ROUTE_GET(router, "/api/returns", handler_returns_list, pool);
+ROUTE_GET(router, "/api/returns/:id", handler_returns_get, pool);
+
+// Admin-protected (custom JWT)
+ROUTE_GET(router, "/api/admin/returns", handler_admin_returns_list, pool);
+ROUTE_PUT(router, "/api/admin/returns/:id/status", handler_admin_returns_update, pool);
+ROUTE_GET(router, "/api/admin/newsletter/subscribers", handler_admin_newsletter_list, pool);
+ROUTE_DELETE(router, "/api/admin/newsletter/subscribers/:id", handler_admin_newsletter_delete, pool);
+ROUTE_GET(router, "/api/admin/contacts", handler_admin_contact_list, pool);
+ROUTE_PUT(router, "/api/admin/contacts/:id/read", handler_admin_contact_mark_read, pool);
 ```
 Pattern: `ROUTE_<METHOD>(router, "path", handler_fn, ctx)`
 
@@ -29,18 +45,22 @@ int handler_name(HttpRequest *req, HttpResponse *res, void *ctx);
 ## Auth Middleware Pattern
 ```c
 // Customer-protected endpoints (Supabase JWT)
-if (!auth_require_user(req, res)) return MHD_YES;
-// Populates req->user_id on success
+const char *user_id = auth_get_user_id(req);
+if (user_id == NULL) {
+    http_response_error(resp, HTTP_STATUS_UNAUTHORIZED, "Authentication required");
+    return;
+}
 
 // Admin-protected endpoints (custom JWT)
-if (!auth_require_admin(req, res)) return MHD_YES;
-// Populates req->admin_id on success
-
-// Permission check (admin)
-if (!admin_has_permission(req, "products.write")) {
-    http_respond_json(res, 403, "{\"error\":\"Forbidden\"}");
-    return MHD_YES;
+// IMPORTANT: Use auth_is_admin(req) — NOT auth_require_admin(req, resp)
+if (!auth_is_admin(req)) {
+    http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+    return;
 }
+
+// Path parameters (for routes with :id)
+// IMPORTANT: Use http_request_get_path_param — NOT http_request_get_param
+const char *id = http_request_get_path_param(req, "id");
 ```
 
 ## CRITICAL: JSON String Handling

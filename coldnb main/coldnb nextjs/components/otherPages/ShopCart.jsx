@@ -31,7 +31,7 @@ export default function ShopCart() {
   const [shippingResult, setShippingResult] = useState(null);
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState("");
-  const { cartProducts, setCartProducts, totalPrice } = useContextElement();
+  const { cartProducts, setCartProducts, totalPrice, removeFromCart, updateQuantity } = useContextElement();
 
   const shippingPrice = shippingResult ? parseFloat(shippingResult.price) : 0;
 
@@ -69,16 +69,11 @@ export default function ShopCart() {
 
   const setQuantity = (id, quantity) => {
     if (quantity >= 1) {
-      const item = cartProducts.filter((elm) => elm.id == id)[0];
-      const items = [...cartProducts];
-      const itemIndex = items.indexOf(item);
-      item.quantity = quantity;
-      items[itemIndex] = item;
-      setCartProducts(items);
+      updateQuantity(id, quantity);
     }
   };
   const removeItem = (id) => {
-    setCartProducts((pre) => [...pre.filter((elm) => elm.id != id)]);
+    removeFromCart(id);
   };
 
   useEffect(() => {

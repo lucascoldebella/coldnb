@@ -64,6 +64,7 @@ void handler_products_register(HttpRouter *router, DbPool *pool) {
     ROUTE_GET(router, "/api/products", handler_products_list, pool);
     ROUTE_GET(router, "/api/products/search", handler_products_search, pool);
     ROUTE_GET(router, "/api/products/featured", handler_products_featured, pool);
+    ROUTE_GET(router, "/api/products/:id/recommendations", handler_products_recommendations, pool);
     ROUTE_GET(router, "/api/products/:id", handler_products_get, pool);
     ROUTE_GET(router, "/api/categories", handler_categories_list, pool);
     ROUTE_GET(router, "/api/categories/:slug/products", handler_categories_products, pool);
@@ -430,4 +431,135 @@ void handler_categories_products(HttpRequest *req, HttpResponse *resp, void *use
     }
 
     handler_products_list(req, resp, user_data);
+}
+
+/*
+ * GET /api/products/:id/recommendations
+ *
+ * Returns up to 8 recommended products based on:
+ * 1. Co-purchased products (from order_items co-occurrence)
+ * 2. Same-category products (fallback / fill)
+ */
+void handler_products_recommendations(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *id_str = http_request_get_path_param(req, "id");
+
+    if (id_str == NULL) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Product ID required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    /* Get the product's category_id */
+    const char *cat_query =
+        "SELECT category_id FROM products WHERE id = $1 AND is_active = true";
+    const char *cat_params[] = { id_str };
+    PGresult *cat_result = db_exec_params(conn, cat_query, 1, cat_params);
+
+    if (!db_result_ok(cat_result) || !db_result_has_rows(cat_result)) {
+        PQclear(cat_result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Product not found");
+        return;
+    }
+
+    const char *category_id_str = PQgetvalue(cat_result, 0, 0);
+    char cat_id_buf[32];
+    strncpy(cat_id_buf, category_id_str ? category_id_str : "0", sizeof(cat_id_buf) - 1);
+    cat_id_buf[sizeof(cat_id_buf) - 1] = '\0';
+    PQclear(cat_result);
+
+    /*
+     * Co-purchased: products that appear in orders alongside the target product.
+     * Ranked by frequency of co-occurrence.
+     */
+    const char *copurchased_query =
+        "SELECT DISTINCT p.id, p.name, p.slug, p.short_description, p.price, "
+        "p.compare_at_price, p.brand, p.is_new, p.is_sale, p.category_id, "
+        "COUNT(*) AS co_count "
+        "FROM order_items oi1 "
+        "JOIN order_items oi2 ON oi1.order_id = oi2.order_id AND oi1.product_id != oi2.product_id "
+        "JOIN products p ON p.id = oi2.product_id "
+        "WHERE oi1.product_id = $1 AND p.is_active = true "
+        "GROUP BY p.id "
+        "ORDER BY co_count DESC "
+        "LIMIT 4";
+    const char *co_params[] = { id_str };
+    PGresult *co_result = db_exec_params(conn, copurchased_query, 1, co_params);
+
+    cJSON *recommendations = cJSON_CreateArray();
+    int added = 0;
+
+    /* Track IDs we've already added to avoid duplicates */
+    int added_ids[8];
+    int added_ids_count = 0;
+    int source_id = atoi(id_str);
+
+    if (db_result_ok(co_result)) {
+        int nrows = PQntuples(co_result);
+        for (int i = 0; i < nrows && added < 4; i++) {
+            DbRow row = { .result = co_result, .row = i };
+            int pid = db_row_get_int(&row, "id");
+            if (pid == source_id) continue;
+            cJSON *product = product_to_json(conn, &row, false);
+            if (product != NULL) {
+                cJSON_AddItemToArray(recommendations, product);
+                added_ids[added_ids_count++] = pid;
+                added++;
+            }
+        }
+    }
+    PQclear(co_result);
+
+    /* Fill remaining slots with same-category products */
+    if (added < 8) {
+        int remaining = 8 - added;
+        char remaining_str[16];
+        snprintf(remaining_str, sizeof(remaining_str), "%d", remaining);
+
+        /* Build exclusion list */
+        char exclude_ids[256];
+        int elen = snprintf(exclude_ids, sizeof(exclude_ids), "%s", id_str);
+        for (int i = 0; i < added_ids_count && elen < (int)sizeof(exclude_ids) - 16; i++) {
+            elen += snprintf(exclude_ids + elen, sizeof(exclude_ids) - (size_t)elen,
+                             ",%d", added_ids[i]);
+        }
+
+        char cat_query_buf[512];
+        snprintf(cat_query_buf, sizeof(cat_query_buf),
+                 "SELECT id, name, slug, short_description, price, compare_at_price, "
+                 "brand, is_new, is_sale, category_id "
+                 "FROM products "
+                 "WHERE is_active = true AND category_id = $1 AND id NOT IN (%s) "
+                 "ORDER BY RANDOM() LIMIT $2",
+                 exclude_ids);
+        const char *cat_fill_params[] = { cat_id_buf, remaining_str };
+        PGresult *cat_fill = db_exec_params(conn, cat_query_buf, 2, cat_fill_params);
+
+        if (db_result_ok(cat_fill)) {
+            int nrows = PQntuples(cat_fill);
+            for (int i = 0; i < nrows; i++) {
+                DbRow row = { .result = cat_fill, .row = i };
+                cJSON *product = product_to_json(conn, &row, false);
+                if (product != NULL) {
+                    cJSON_AddItemToArray(recommendations, product);
+                }
+            }
+        }
+        PQclear(cat_fill);
+    }
+
+    db_pool_release(pool, conn);
+
+    cJSON *response = json_create_success(recommendations);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
 }

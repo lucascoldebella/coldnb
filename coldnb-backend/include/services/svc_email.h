@@ -55,10 +55,26 @@ int email_service_init(const EmailServiceConfig *config);
 void email_service_shutdown(void);
 bool email_service_is_initialized(void);
 
+/* Generate an unsubscribe URL with HMAC token for the given email */
+char *email_service_unsubscribe_url(const char *email);
+
+/* Verify an unsubscribe token for the given email */
+bool email_service_verify_unsubscribe_token(const char *email, const char *token);
+
+typedef struct {
+    const char *customer_email;
+    const char *customer_name;
+    int item_count;
+    double cart_total;
+    const char *top_product_name;
+    const char *top_product_image;
+} EmailAbandonedCart;
+
 int email_service_send_contact_notification(const EmailContactSubmission *submission);
 int email_service_send_order_confirmation(const EmailOrderCreated *order);
 int email_service_send_internal_order_notification(const EmailOrderCreated *order);
 int email_service_send_order_status_update(const EmailOrderStatusUpdate *update);
 int email_service_send_order_shipped(const EmailOrderShipped *shipped);
+int email_service_send_abandoned_cart(const EmailAbandonedCart *cart);
 
 #endif /* COLDNB_SVC_EMAIL_H */

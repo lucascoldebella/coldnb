@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { getApiBaseUrl } from "@/lib/apiBase";
@@ -283,7 +284,7 @@ export default function OrderTrac() {
                   }}>
                     <div style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: "#f3f4f6", overflow: "hidden", flexShrink: 0 }}>
                       {item.product_image && (
-                        <img src={item.product_image} alt={item.product_name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        <Image src={item.product_image} alt={item.product_name} width={56} height={56} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       )}
                     </div>
                     <div style={{ flex: 1 }}>

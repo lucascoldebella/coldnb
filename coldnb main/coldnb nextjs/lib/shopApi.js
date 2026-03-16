@@ -127,4 +127,14 @@ export async function getProductsByIds(ids) {
   return results.filter(Boolean);
 }
 
+/**
+ * Get product recommendations (co-purchased + same category)
+ * @param {number} productId - Product ID to get recommendations for
+ * @returns {Array} Array of transformed products
+ */
+export async function getRecommendations(productId) {
+  const response = await shopApi.get(`/api/products/${productId}/recommendations`);
+  return (response.data.data || []).map(transformProduct);
+}
+
 export default shopApi;

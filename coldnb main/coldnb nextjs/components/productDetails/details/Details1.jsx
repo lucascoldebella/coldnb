@@ -145,11 +145,14 @@ export default function Details1({ product }) {
                     <div>
                       <div className="tf-product-info-by-btn mb_10">
                         <a
-                          onClick={() => addProductToCart(product, quantity)}
-                          className="btn-style-2 flex-grow-1 text-btn-uppercase fw-6 btn-add-to-cart"
+                          onClick={() => product.stock > 0 && addProductToCart(product, quantity)}
+                          className={`btn-style-2 flex-grow-1 text-btn-uppercase fw-6 btn-add-to-cart${product.stock <= 0 ? " disabled" : ""}`}
+                          style={product.stock <= 0 ? { opacity: 0.5, pointerEvents: "none" } : undefined}
                         >
                           <span>
-                            {isAddedToCartProducts(product.id)
+                            {product.stock <= 0
+                              ? t("product.outOfStock")
+                              : isAddedToCartProducts(product.id)
                               ? t("product.alreadyAdded")
                               : t("product.addToCartDash")}
                           </span>
@@ -288,15 +291,17 @@ export default function Details1({ product }) {
                     <ul className="tf-product-info-sku">
                       <li>
                         <p className="text-caption-1">{t("product.sku")}</p>
-                        <p className="text-caption-1 text-1">53453412</p>
+                        <p className="text-caption-1 text-1">{product.sku || "—"}</p>
                       </li>
                       <li>
                         <p className="text-caption-1">{t("product.vendor")}</p>
-                        <p className="text-caption-1 text-1">ColdnbMain</p>
+                        <p className="text-caption-1 text-1">{product.brand || "Coldnb"}</p>
                       </li>
                       <li>
                         <p className="text-caption-1">{t("product.availableLabel")}</p>
-                        <p className="text-caption-1 text-1">{t("product.instock")}</p>
+                        <p className="text-caption-1 text-1" style={product.stock <= 0 ? { color: "#dc3545" } : undefined}>
+                          {product.stock > 0 ? t("product.instock") : t("product.outOfStock")}
+                        </p>
                       </li>
                       <li>
                         <p className="text-caption-1">{t("product.categoriesLabel")}</p>

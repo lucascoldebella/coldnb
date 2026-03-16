@@ -23,6 +23,8 @@ psql -U coldnb -d coldnb -f coldnb-backend/sql/003_homepage_content.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/004_shipping_zones.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/005_navigation_menus.sql
 psql -U coldnb -d coldnb -f coldnb-backend/sql/006_order_tracking.sql
+psql -U coldnb -d coldnb -f coldnb-backend/sql/007_guest_checkout_and_returns.sql
+psql -U coldnb -d coldnb -f coldnb-backend/sql/008_abandoned_cart_and_loyalty.sql
 ```
 
 ### 3. Backend Setup

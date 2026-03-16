@@ -46,7 +46,7 @@ export default function CookieConsent() {
         <div className="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
           <p className="text-caption-1 mb-0" style={{ maxWidth: 700 }}>
             {t("cookie.message")}{" "}
-            <Link href="/term-of-use" className="fw-6 link">
+            <Link href="/privacy-policy" className="fw-6 link">
               {t("cookie.learnMore")}
             </Link>
           </p>

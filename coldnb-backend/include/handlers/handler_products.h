@@ -27,4 +27,7 @@ void handler_categories_list(HttpRequest *req, HttpResponse *resp, void *user_da
 /* GET /api/categories/:slug/products - Get products by category */
 void handler_categories_products(HttpRequest *req, HttpResponse *resp, void *user_data);
 
+/* GET /api/products/:id/recommendations - Get product recommendations */
+void handler_products_recommendations(HttpRequest *req, HttpResponse *resp, void *user_data);
+
 #endif /* COLDNB_HANDLER_PRODUCTS_H */

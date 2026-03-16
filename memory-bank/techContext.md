@@ -121,6 +121,9 @@ psql -U coldnb -d coldnb -f sql/002_admin_permissions.sql
 psql -U coldnb -d coldnb -f sql/003_homepage_content.sql
 psql -U coldnb -d coldnb -f sql/004_shipping_zones.sql
 psql -U coldnb -d coldnb -f sql/005_navigation_menus.sql
+psql -U coldnb -d coldnb -f sql/006_order_tracking.sql
+psql -U coldnb -d coldnb -f sql/007_guest_checkout_and_returns.sql
+psql -U coldnb -d coldnb -f sql/008_abandoned_cart_and_loyalty.sql
 
 # Reset schema (DESTRUCTIVE — deletes all data)
 psql -U coldnb -d coldnb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO coldnb;"

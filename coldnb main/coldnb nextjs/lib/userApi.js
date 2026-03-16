@@ -41,6 +41,7 @@ export const profileApi = {
   get: () => userApi.get("/api/user/profile"),
   update: (data) => userApi.put("/api/user/profile", data),
   deleteAccount: () => userApi.delete("/api/user/profile"),
+  exportData: () => userApi.get("/api/user/export", { responseType: "blob" }),
 };
 
 // Addresses API
@@ -56,6 +57,13 @@ export const addressesApi = {
 export const ordersApi = {
   list: (params = {}) => userApi.get("/api/orders", { params }),
   get: (id) => userApi.get(`/api/orders/${id}`),
+  cancel: (id) => userApi.put(`/api/orders/${id}/cancel`),
+};
+
+// Returns API
+export const returnsApi = {
+  list: () => userApi.get("/api/returns"),
+  get: (id) => userApi.get(`/api/returns/${id}`),
 };
 
 // Cart API

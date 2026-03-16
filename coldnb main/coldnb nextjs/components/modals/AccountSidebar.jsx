@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useUserAuth } from "@/context/UserAuthContext";
@@ -22,9 +23,11 @@ export default function AccountSidebar() {
           <div className="sidebar-account">
             <div className="account-avatar">
               <div className="image">
-                <img
+                <Image
                   src={profile?.avatar_url || "/images/avatar/user-account.jpg"}
                   alt=""
+                  width={281}
+                  height={280}
                 />
               </div>
               <h6 className="mb_4">{profile?.full_name || t("account.myAccount")}</h6>
@@ -109,6 +112,37 @@ export default function AccountSidebar() {
                     />
                   </svg>
                   {t("account.myAddress")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`/my-account-returns`}
+                  className="my-account-nav-item"
+                >
+                  <svg
+                    width={24}
+                    height={24}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <polyline
+                      points="1 4 1 10 7 10"
+                      stroke="#181818"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M3.51 15a9 9 0 1 0 .49-3.75"
+                      stroke="#181818"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                  </svg>
+                  {t("returns.title")}
                 </Link>
               </li>
               <li>

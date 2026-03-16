@@ -24,4 +24,7 @@ void handler_orders_get(HttpRequest *req, HttpResponse *resp, void *user_data);
 /* GET /api/orders/track - Public order tracking (order_number + email) */
 void handler_orders_track(HttpRequest *req, HttpResponse *resp, void *user_data);
 
+/* PUT /api/orders/:id/cancel - Customer-initiated order cancellation */
+void handler_orders_cancel(HttpRequest *req, HttpResponse *resp, void *user_data);
+
 #endif /* COLDNB_HANDLER_ORDERS_H */

@@ -96,6 +96,18 @@ const response = await adminApi.get("/api/admin/products");
 // Handles 401 auto-logout, base URL from NEXT_PUBLIC_API_URL
 ```
 
+## Customer API Calls
+```jsx
+// Use userApi named exports (has Supabase JWT interceptor)
+import { ordersApi, returnsApi, addressesApi, profileApi, cartApi } from "@/lib/userApi";
+const orders = await ordersApi.list();
+const returns = await returnsApi.list();
+await ordersApi.cancel(orderId);
+
+// For product data (public, no auth)
+import { getProducts, getProduct, searchProducts, transformProduct } from "@/lib/shopApi";
+```
+
 ## Image Upload (Admin)
 ```jsx
 // Existing upload endpoint

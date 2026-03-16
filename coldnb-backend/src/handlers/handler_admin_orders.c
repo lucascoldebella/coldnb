@@ -378,11 +378,51 @@ void handler_admin_orders_update_status(HttpRequest *req, HttpResponse *resp, vo
         const char *deliver_params[] = { order_id };
         PGresult *deliver_result = db_exec_params(conn, deliver_query, 1, deliver_params);
         PQclear(deliver_result);
+
+        /* Award loyalty points: 1 point per R$ 1 spent */
+        const char *points_query =
+            "INSERT INTO loyalty_points (user_id, points, reason, reference_id) "
+            "SELECT user_id, FLOOR(total_price)::int, 'order_completed', $1 "
+            "FROM orders WHERE id = $1 AND user_id IS NOT NULL "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM loyalty_points "
+            "  WHERE reference_id = $1 AND reason = 'order_completed'"
+            ")";
+        const char *points_params[] = { order_id };
+        PGresult *points_result = db_exec_params(conn, points_query, 1, points_params);
+        if (db_result_ok(points_result)) {
+            int awarded = PQcmdTuples(points_result)[0] != '0';
+            if (awarded) {
+                LOG_INFO("Loyalty points awarded for order %s", order_id);
+            }
+        }
+        PQclear(points_result);
     } else if (strcmp(status_copy, "cancelled") == 0) {
         const char *cancel_query = "UPDATE orders SET cancelled_at = NOW() WHERE id = $1";
         const char *cancel_params[] = { order_id };
         PGresult *cancel_result = db_exec_params(conn, cancel_query, 1, cancel_params);
         PQclear(cancel_result);
+
+        /* Restore stock for each order item */
+        const char *restore_query =
+            "SELECT product_id, quantity FROM order_items WHERE order_id = $1";
+        const char *restore_params[] = { order_id };
+        PGresult *restore_result = db_exec_params(conn, restore_query, 1, restore_params);
+
+        if (db_result_ok(restore_result)) {
+            int restore_count = PQntuples(restore_result);
+            for (int i = 0; i < restore_count; i++) {
+                const char *pid = PQgetvalue(restore_result, i, 0);
+                const char *qty = PQgetvalue(restore_result, i, 1);
+                const char *stock_q =
+                    "UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2";
+                const char *stock_p[] = { qty, pid };
+                PGresult *stock_r = db_exec_params(conn, stock_q, 2, stock_p);
+                PQclear(stock_r);
+            }
+            LOG_INFO("Stock restored for %d items on order cancellation", restore_count);
+        }
+        PQclear(restore_result);
     }
 
     /* Add history entry */

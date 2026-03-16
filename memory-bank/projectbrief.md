@@ -24,10 +24,12 @@
 
 ## Scope
 **In scope:**
-- Jewelry product catalog with variants (colors, sizes, images)
-- Cart, checkout, orders, returns
-- Admin panel (products, orders, customers, shipping, marketing, analytics, email)
-- Newsletter via Brevo; contact form with email notifications
+- Jewelry product catalog with variants (colors, sizes, images), stock badges, sold-out states
+- Cart, checkout, orders, order cancellation, returns, guest checkout
+- Loyalty program (auto-award on delivery, rewards catalog, redemption → discount codes)
+- Admin panel (products, orders, returns, customers, inventory, discounts, newsletter subscribers, contact submissions, marketing, analytics, email, team)
+- Newsletter via Brevo; contact form with email notifications + admin review
+- Free shipping threshold (R$ 75+), dynamic sitemap
 - Bilingual i18n (PT-BR / EN)
 
 **Out of scope:**

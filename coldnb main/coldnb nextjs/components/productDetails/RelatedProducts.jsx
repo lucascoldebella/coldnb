@@ -3,18 +3,29 @@ import React, { useEffect, useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Pagination } from "swiper/modules";
 import ProductCard1 from "../productCards/ProductCard1";
-import { getProducts } from "@/lib/shopApi";
+import { getProducts, getRecommendations } from "@/lib/shopApi";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
-export default function RelatedProducts() {
+export default function RelatedProducts({ productId }) {
   const { t } = useLanguage();
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
-    getProducts({ per_page: 8 })
-      .then((res) => setProducts(res.products || []))
-      .catch(() => {});
-  }, []);
+    if (productId) {
+      getRecommendations(productId)
+        .then((res) => setProducts(res || []))
+        .catch(() => {
+          // Fallback to generic products if recommendations fail
+          getProducts({ per_page: 8 })
+            .then((res) => setProducts(res.products || []))
+            .catch(() => {});
+        });
+    } else {
+      getProducts({ per_page: 8 })
+        .then((res) => setProducts(res.products || []))
+        .catch(() => {});
+    }
+  }, [productId]);
 
   if (products.length === 0) return null;
 
@@ -53,7 +64,7 @@ export default function RelatedProducts() {
                 el: ".spd4",
               }}
             >
-              {products.slice(0, 4).map((product, i) => (
+              {products.slice(0, 8).map((product, i) => (
                 <SwiperSlide key={product.id || i} className="swiper-slide">
                   <ProductCard1 product={product} />
                 </SwiperSlide>

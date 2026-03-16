@@ -4,12 +4,25 @@ import Image from "next/image";
 import Link from "next/link";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { ordersApi } from "@/lib/userApi";
+import { useContextElement } from "@/context/Context";
+import toast from "react-hot-toast";
 
 export default function OrderDetails({ orderId }) {
   const { t } = useLanguage();
+  const { addProductToCart } = useContextElement();
   const [activeTab, setActiveTab] = useState(1);
   const [order, setOrder] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [reordering, setReordering] = useState(false);
+  const [reorderDone, setReorderDone] = useState(false);
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnReason, setReturnReason] = useState("defective");
+  const [returnDescription, setReturnDescription] = useState("");
+  const [returnLoading, setReturnLoading] = useState(false);
+  const [returnSuccess, setReturnSuccess] = useState(false);
+  const [returnError, setReturnError] = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   useEffect(() => {
     if (!orderId) {
@@ -88,6 +101,58 @@ export default function OrderDetails({ orderId }) {
   const history = order.history || [];
   const firstItem = items[0];
 
+  const handleReorder = () => {
+    if (items.length === 0) return;
+    setReordering(true);
+    items.forEach((item) => {
+      addProductToCart({
+        id: item.product_id,
+        title: item.product_name,
+        price: parseFloat(item.unit_price) || 0,
+        imgSrc: item.product_image || "/images/products/placeholder.jpg",
+        quantity: item.quantity,
+      });
+    });
+    setReordering(false);
+    setReorderDone(true);
+    setTimeout(() => setReorderDone(false), 3000);
+  };
+
+  const handleSubmitReturn = async () => {
+    setReturnLoading(true);
+    setReturnError("");
+    try {
+      const { default: userApi } = await import("@/lib/userApi");
+      const res = await userApi.post("/api/returns", {
+        order_id: order.id,
+        reason: returnReason,
+        description: returnDescription || null,
+      });
+      if (res.data?.success || res.status === 201) {
+        setReturnSuccess(true);
+        setShowReturnForm(false);
+      }
+    } catch (err) {
+      setReturnError(err.response?.data?.error || t("returns.submitError"));
+    } finally {
+      setReturnLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    setCancelLoading(true);
+    try {
+      await ordersApi.cancel(order.id);
+      setOrder((prev) => ({ ...prev, status: "cancelled" }));
+      setShowCancelConfirm(false);
+      toast.success(t("orders.cancelSuccess"));
+    } catch (err) {
+      toast.error(err.response?.data?.error || t("orders.cancelError"));
+    } finally {
+      setCancelLoading(false);
+    }
+  };
+
   return (
     <div className="my-account-content">
       <div className="account-order-details">
@@ -110,6 +175,114 @@ export default function OrderDetails({ orderId }) {
               </h6>
             </div>
           </div>
+          <div className="d-flex gap-12 mt_16 mb_16 flex-wrap">
+            <button
+              className="tf-btn btn-fill radius-4"
+              onClick={handleReorder}
+              disabled={reordering || items.length === 0}
+            >
+              <span className="text">
+                {reorderDone ? t("orders.reorderDone") : t("orders.reorder")}
+              </span>
+            </button>
+            <Link
+              href={`/invoice/${order.id}`}
+              target="_blank"
+              className="tf-btn btn-outline radius-4"
+            >
+              <span className="text">{t("orders.invoice")}</span>
+            </Link>
+            {order.status === "delivered" && !returnSuccess && (
+              <button
+                className="tf-btn btn-outline radius-4"
+                onClick={() => setShowReturnForm(!showReturnForm)}
+              >
+                <span className="text">{t("orders.requestReturn")}</span>
+              </button>
+            )}
+            {(order.status === "pending" || order.status === "processing") && (
+              !showCancelConfirm ? (
+                <button
+                  className="tf-btn btn-outline radius-4"
+                  onClick={() => setShowCancelConfirm(true)}
+                  style={{ borderColor: "#dc3545", color: "#dc3545" }}
+                >
+                  <span className="text">{t("orders.cancelOrder")}</span>
+                </button>
+              ) : (
+                <div className="d-flex align-items-center gap-8">
+                  <span style={{ fontSize: 13, color: "#dc3545" }}>{t("orders.cancelOrderConfirm")}</span>
+                  <button
+                    className="tf-btn radius-4"
+                    onClick={handleCancelOrder}
+                    disabled={cancelLoading}
+                    style={{ background: "#dc3545", borderColor: "#dc3545", color: "#fff" }}
+                  >
+                    <span className="text">{cancelLoading ? "..." : t("common.confirm")}</span>
+                  </button>
+                  <button
+                    className="tf-btn btn-outline radius-4"
+                    onClick={() => setShowCancelConfirm(false)}
+                  >
+                    <span className="text">{t("common.cancel")}</span>
+                  </button>
+                </div>
+              )
+            )}
+          </div>
+
+          {returnSuccess && (
+            <div className="alert alert-success mb_16" style={{ fontSize: 13 }}>
+              {t("returns.submitSuccess")}
+            </div>
+          )}
+
+          {showReturnForm && (
+            <div className="p_16 mb_20" style={{ background: "#f8f9fa", borderRadius: 8 }}>
+              <h6 className="mb_12">{t("returns.formTitle")}</h6>
+              <div className="form-group mb_12">
+                <label className="form-label">{t("returns.reason")}</label>
+                <select
+                  className="form-control"
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                >
+                  <option value="defective">{t("returns.reasonDefective")}</option>
+                  <option value="wrong_item">{t("returns.reasonWrongItem")}</option>
+                  <option value="changed_mind">{t("returns.reasonChangedMind")}</option>
+                  <option value="other">{t("returns.reasonOther")}</option>
+                </select>
+              </div>
+              <div className="form-group mb_12">
+                <label className="form-label">{t("returns.description")}</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  placeholder={t("returns.descriptionPlaceholder")}
+                  value={returnDescription}
+                  onChange={(e) => setReturnDescription(e.target.value)}
+                />
+              </div>
+              {returnError && (
+                <p style={{ color: "#dc3545", fontSize: 13, marginBottom: 8 }}>{returnError}</p>
+              )}
+              <div className="d-flex gap-8">
+                <button
+                  className="tf-btn btn-fill radius-4"
+                  onClick={handleSubmitReturn}
+                  disabled={returnLoading}
+                >
+                  <span className="text">{returnLoading ? t("common.loading") : t("returns.submit")}</span>
+                </button>
+                <button
+                  className="tf-btn btn-outline radius-4"
+                  onClick={() => setShowReturnForm(false)}
+                >
+                  <span className="text">{t("common.cancel")}</span>
+                </button>
+              </div>
+            </div>
+          )}
           <div className="tf-grid-layout md-col-2 gap-15">
             <div className="item">
               <div className="text-2 text_black-2">{t("orders.date")}</div>

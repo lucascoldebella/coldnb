@@ -112,35 +112,72 @@ Getting this wrong causes invisible/broken modal content. See `.claude/rules/ui-
 
 ```
 Customer-facing (Supabase auth required for protected):
-  GET  /api/products          - list products
-  GET  /api/products/:id      - single product
-  GET  /api/categories        - list categories
-  POST /api/cart              - add to cart (auth required)
-  GET  /api/cart              - get cart (auth required)
-  POST /api/orders            - create order (auth required)
-  GET  /api/orders/:id        - get order (auth required)
-  POST /api/contact           - submit contact form
-  POST /api/newsletter        - subscribe to newsletter
+  GET  /api/products            - list products (public)
+  GET  /api/products/:id        - single product (public)
+  GET  /api/products/search     - search products (public)
+  GET  /api/products/:id/recommendations - product recommendations (public)
+  GET  /api/categories          - list categories (public)
+  POST /api/cart                - add to cart (auth)
+  GET  /api/cart                - get cart (auth)
+  POST /api/orders              - create order (auth)
+  GET  /api/orders/:id          - get order (auth)
+  PUT  /api/orders/:id/cancel   - cancel order (auth, pending/processing only)
+  POST /api/guest-orders        - guest checkout (public, no auth)
+  GET  /api/track-order         - public order tracking (order_number + email)
+  POST /api/returns             - request return (auth, delivered orders only)
+  GET  /api/returns             - list my returns (auth)
+  GET  /api/returns/:id         - get return detail (auth)
+  GET  /api/loyalty/balance     - loyalty points balance (auth)
+  GET  /api/loyalty/history     - loyalty points history (auth)
+  GET  /api/loyalty/rewards     - available rewards (auth)
+  POST /api/loyalty/redeem      - redeem reward (auth)
+  POST /api/contact             - submit contact form (public)
+  POST /api/newsletter/subscribe - subscribe to newsletter (public)
+  GET  /api/discount-codes/check - validate discount code (public)
+  GET  /api/email/unsubscribe   - one-click email unsubscribe (public, HMAC-verified)
 
 Admin (custom JWT required for all):
-  POST /api/admin/login       - admin login
-  GET  /api/admin/products    - list products
-  POST /api/admin/products    - create product
-  PUT  /api/admin/products/:id - update product
-  GET  /api/admin/orders      - list orders
-  PUT  /api/admin/orders/:id/status - update order status + sends email
-  GET  /api/admin/customers   - list customers
-  GET  /api/admin/analytics   - analytics data
-  POST /api/admin/upload      - image upload (→ public/uploads/products/)
+  POST /api/admin/login         - admin login
+  GET  /api/admin/products      - list products
+  POST /api/admin/products      - create product
+  PUT  /api/admin/products/:id  - update product
+  GET  /api/admin/orders        - list orders
+  PUT  /api/admin/orders/:id/status - update order status + sends email + auto-awards loyalty on delivery
+  PUT  /api/admin/orders/:id/tracking - add tracking number + send shipped email
+  GET  /api/admin/returns       - list return requests
+  PUT  /api/admin/returns/:id/status - update return status
+  GET  /api/admin/customers     - list customers
+  GET  /api/admin/customers/:id - customer detail
+  GET  /api/admin/analytics     - analytics data
+  POST /api/admin/upload        - image upload (→ public/uploads/products/)
+  GET  /api/admin/discounts     - list discount codes
+  POST /api/admin/discounts     - create discount code
+  PUT  /api/admin/discounts/:id - update discount code
+  DELETE /api/admin/discounts/:id - delete discount code
+  GET  /api/admin/newsletter/subscribers - list newsletter subscribers
+  DELETE /api/admin/newsletter/subscribers/:id - delete subscriber
+  GET  /api/admin/contacts      - list contact submissions
+  PUT  /api/admin/contacts/:id/read - mark contact as read
+  GET  /api/admin/abandoned-carts - list eligible abandoned carts
+  POST /api/admin/abandoned-carts/send - send recovery emails
+  POST /api/admin/loyalty/grant - manually grant points
+  GET  /api/admin/loyalty/rewards - list rewards catalog
+  POST /api/admin/loyalty/rewards - create reward
+  PUT  /api/admin/loyalty/rewards/:id - update reward
+  DELETE /api/admin/loyalty/rewards/:id - delete reward
 ```
 
 ## Data Flow: Product Display
 ```
-data/products.js (static, 133KB)
-  → Frontend product listing/cards (for browsing)
-  → Backend /api/products (DB-sourced, for dynamic/admin operations)
+Production path:
+  lib/shopApi.js → GET /api/products → C Backend → PostgreSQL
+    → transformProduct() maps backend shape → frontend shape
+    → ProductCard1.jsx renders (stock badge, sold-out state, price, sale %)
+
+Legacy path (template demo pages only):
+  data/products.js (static, 133KB) → some homepage themes and demo components
 ```
-Static file is used for fast client-side filtering; DB is authoritative for inventory/admin.
+All production shop pages use the API. Static file remains only for template demo pages.
 
 ## Error Handling Conventions
 - **Backend:** JSON error responses `{"error": "message"}` with appropriate HTTP status codes

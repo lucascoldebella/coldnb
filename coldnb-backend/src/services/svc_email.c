@@ -2,6 +2,7 @@
 #include "clients/client_brevo.h"
 #include "log/log.h"
 #include "util/string_util.h"
+#include "util/hash_util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -155,6 +156,101 @@ bool email_service_is_initialized(void) {
     return email_state.initialized;
 }
 
+/* HMAC key for unsubscribe tokens — derived from store_name + sender_email */
+static char *unsubscribe_hmac_key(size_t *key_len) {
+    char *material = str_printf("coldnb-unsub:%s:%s",
+                                email_state.store_name ? email_state.store_name : "",
+                                email_state.sender_email ? email_state.sender_email : "");
+    if (material == NULL) return NULL;
+    *key_len = strlen(material);
+    return material;
+}
+
+char *email_service_unsubscribe_url(const char *email) {
+    if (!email_state.initialized || str_is_empty(email)) return NULL;
+
+    size_t key_len = 0;
+    char *key = unsubscribe_hmac_key(&key_len);
+    if (key == NULL) return NULL;
+
+    char *token = hash_hmac_sha256(key, key_len, email, strlen(email));
+    free(key);
+    if (token == NULL) return NULL;
+
+    char *encoded_email = str_url_encode(email);
+    if (encoded_email == NULL) {
+        free(token);
+        return NULL;
+    }
+
+    char *url = str_printf("%s/unsubscribe?email=%s&token=%s",
+                           email_state.site_url, encoded_email, token);
+    free(encoded_email);
+    free(token);
+    return url;
+}
+
+bool email_service_verify_unsubscribe_token(const char *email, const char *token) {
+    if (str_is_empty(email) || str_is_empty(token)) return false;
+
+    size_t key_len = 0;
+    char *key = unsubscribe_hmac_key(&key_len);
+    if (key == NULL) return false;
+
+    char *expected = hash_hmac_sha256(key, key_len, email, strlen(email));
+    free(key);
+    if (expected == NULL) return false;
+
+    bool valid = hash_constant_compare(expected, token);
+    free(expected);
+    return valid;
+}
+
+/* Branded HTML email wrapper */
+static char *email_wrap_html(const char *body_content, const char *unsub_url) {
+    const char *footer_unsub = "";
+    char *unsub_link = NULL;
+    if (!str_is_empty(unsub_url)) {
+        unsub_link = str_printf(
+            "<a href=\"%s\" style=\"color:#9ca3af;text-decoration:underline\">Unsubscribe</a>",
+            unsub_url);
+        footer_unsub = unsub_link;
+    }
+
+    char *html = str_printf(
+        "<!DOCTYPE html>"
+        "<html lang=\"en\">"
+        "<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>"
+        "<body style=\"margin:0;padding:0;background-color:#f3f4f6;font-family:'Helvetica Neue',Arial,sans-serif\">"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f3f4f6\">"
+        "<tr><td align=\"center\" style=\"padding:32px 16px\">"
+        "<table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%%\">"
+        /* Header */
+        "<tr><td style=\"background-color:#111827;padding:24px 32px;border-radius:12px 12px 0 0;text-align:center\">"
+        "<span style=\"font-size:24px;font-weight:700;color:#ffffff;letter-spacing:1px\">%s</span>"
+        "</td></tr>"
+        /* Body */
+        "<tr><td style=\"background-color:#ffffff;padding:32px;color:#1f2937;font-size:15px;line-height:1.7\">"
+        "%s"
+        "</td></tr>"
+        /* Footer */
+        "<tr><td style=\"background-color:#f9fafb;padding:20px 32px;border-radius:0 0 12px 12px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af\">"
+        "<p style=\"margin:0 0 8px\">&copy; %s. All rights reserved.</p>"
+        "%s"
+        "</td></tr>"
+        "</table>"
+        "</td></tr>"
+        "</table>"
+        "</body></html>",
+        email_state.store_name,
+        body_content,
+        email_state.store_name,
+        footer_unsub);
+
+    free(unsub_link);
+    return html;
+}
+
 int email_service_send_contact_notification(const EmailContactSubmission *submission) {
     if (!email_state.initialized || submission == NULL || str_is_empty(email_state.notification_email)) {
         return -1;
@@ -181,22 +277,27 @@ int email_service_send_contact_notification(const EmailContactSubmission *submis
         !str_is_empty(submission->phone) ? submission->phone : "-",
         submission->subject ? submission->subject : "No subject",
         submission->message ? submission->message : "");
-    char *html_body = str_printf(
-        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
-        "<h2 style=\"margin:0 0 16px\">New contact form submission</h2>"
-        "<p><strong>ID:</strong> %s</p>"
-        "<p><strong>Name:</strong> %s</p>"
-        "<p><strong>Email:</strong> %s</p>"
-        "<p><strong>Phone:</strong> %s</p>"
-        "<p><strong>Subject:</strong> %s</p>"
-        "<p><strong>Message:</strong><br/>%s</p>"
-        "</body></html>",
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">New contact form submission</h2>"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+        "<tr><td style=\"padding:16px\">"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"4\" cellspacing=\"0\">"
+        "<tr><td style=\"color:#6b7280;width:100px\">ID</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Name</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Email</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Phone</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Subject</td><td>%s</td></tr>"
+        "</table>"
+        "</td></tr></table>"
+        "<p><strong>Message:</strong></p>"
+        "<div style=\"background:#f9fafb;padding:16px;border-radius:8px;border:1px solid #e5e7eb\">%s</div>",
         submission->submission_id ? submission->submission_id : "-",
         safe_name ? safe_name : "-",
         safe_email ? safe_email : "-",
         !str_is_empty(submission->phone) ? (safe_phone ? safe_phone : "-") : "-",
         safe_subject ? safe_subject : "No subject",
         safe_message ? safe_message : "");
+    char *html_body = email_wrap_html(inner_html, NULL);
 
     BrevoEmailRequest request = {
         .sender_email = email_state.sender_email,
@@ -220,6 +321,7 @@ int email_service_send_contact_notification(const EmailContactSubmission *submis
     free(safe_message);
     free(subject);
     free(text_body);
+    free(inner_html);
     free(html_body);
 
     return result;
@@ -234,6 +336,7 @@ int email_service_send_order_confirmation(const EmailOrderCreated *order) {
     snprintf(total_str, sizeof(total_str), "%.2f", order->total);
 
     char *orders_link = orders_url();
+    char *unsub_url = email_service_unsubscribe_url(order->customer_email);
     char *safe_name = str_escape_html(order->customer_name ? order->customer_name : "Customer");
     char *safe_payment = str_escape_html(order->payment_method ? order->payment_method : "Pending confirmation");
     char *safe_city = str_escape_html(order->shipping_city ? order->shipping_city : "");
@@ -264,21 +367,24 @@ int email_service_send_order_confirmation(const EmailOrderCreated *order) {
         !str_is_empty(order->shipping_state) ? order->shipping_state : "",
         orders_link ? orders_link : email_state.site_url,
         email_state.store_name);
-    char *html_body = str_printf(
-        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
-        "<h2 style=\"margin:0 0 16px\">Order received</h2>"
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">Order received</h2>"
         "<p>Hello %s,</p>"
         "<p>We received your order <strong>%s</strong>.</p>"
-        "<ul>"
-        "<li><strong>Total:</strong> R$ %s</li>"
-        "<li><strong>Items:</strong> %d</li>"
-        "<li><strong>Payment method:</strong> %s</li>"
-        "<li><strong>Shipping destination:</strong> %s%s%s</li>"
-        "</ul>"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+        "<tr><td style=\"padding:16px\">"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"4\" cellspacing=\"0\">"
+        "<tr><td style=\"color:#6b7280;width:140px\">Total</td><td style=\"font-weight:600\">R$ %s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Items</td><td>%d</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Payment</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Shipping to</td><td>%s%s%s</td></tr>"
+        "</table>"
+        "</td></tr></table>"
         "%s"
-        "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px\">View my orders</a></p>"
-        "<p>Thank you,<br/>%s</p>"
-        "</body></html>",
+        "<p style=\"text-align:center;margin:24px 0\">"
+        "<a href=\"%s\" style=\"display:inline-block;padding:12px 28px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600\">View my orders</a>"
+        "</p>"
+        "<p style=\"color:#6b7280;font-size:13px\">Thank you for shopping with us!</p>",
         safe_name ? safe_name : "Customer",
         order->order_number ? order->order_number : "-",
         total_str,
@@ -288,8 +394,8 @@ int email_service_send_order_confirmation(const EmailOrderCreated *order) {
         !str_is_empty(order->shipping_city) && !str_is_empty(order->shipping_state) ? ", " : "",
         !str_is_empty(order->shipping_state) ? (safe_state ? safe_state : "") : "",
         notes_section ? notes_section : "",
-        orders_link ? orders_link : email_state.site_url,
-        email_state.store_name);
+        orders_link ? orders_link : email_state.site_url);
+    char *html_body = email_wrap_html(inner_html, unsub_url);
 
     BrevoEmailRequest request = {
         .sender_email = email_state.sender_email,
@@ -307,6 +413,7 @@ int email_service_send_order_confirmation(const EmailOrderCreated *order) {
     int result = email_send(&request);
 
     free(orders_link);
+    free(unsub_url);
     free(safe_name);
     free(safe_payment);
     free(safe_city);
@@ -315,6 +422,7 @@ int email_service_send_order_confirmation(const EmailOrderCreated *order) {
     free(notes_section);
     free(subject);
     free(text_body);
+    free(inner_html);
     free(html_body);
 
     return result;
@@ -346,24 +454,26 @@ int email_service_send_internal_order_notification(const EmailOrderCreated *orde
         total_str,
         order->item_count,
         order->payment_method ? order->payment_method : "-");
-    char *html_body = str_printf(
-        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
-        "<h2 style=\"margin:0 0 16px\">New order received</h2>"
-        "<ul>"
-        "<li><strong>Order:</strong> %s</li>"
-        "<li><strong>Customer:</strong> %s</li>"
-        "<li><strong>Email:</strong> %s</li>"
-        "<li><strong>Total:</strong> R$ %s</li>"
-        "<li><strong>Items:</strong> %d</li>"
-        "<li><strong>Payment method:</strong> %s</li>"
-        "</ul>"
-        "</body></html>",
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">New order received</h2>"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+        "<tr><td style=\"padding:16px\">"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"4\" cellspacing=\"0\">"
+        "<tr><td style=\"color:#6b7280;width:140px\">Order</td><td style=\"font-weight:600\">%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Customer</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Email</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Total</td><td style=\"font-weight:600\">R$ %s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Items</td><td>%d</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Payment</td><td>%s</td></tr>"
+        "</table>"
+        "</td></tr></table>",
         order->order_number ? order->order_number : "-",
         safe_name ? safe_name : "-",
         safe_email ? safe_email : "-",
         total_str,
         order->item_count,
         safe_payment ? safe_payment : "-");
+    char *html_body = email_wrap_html(inner_html, NULL);
 
     BrevoEmailRequest request = {
         .sender_email = email_state.sender_email,
@@ -385,6 +495,7 @@ int email_service_send_internal_order_notification(const EmailOrderCreated *orde
     free(safe_payment);
     free(subject);
     free(text_body);
+    free(inner_html);
     free(html_body);
 
     return result;
@@ -396,6 +507,7 @@ int email_service_send_order_shipped(const EmailOrderShipped *shipped) {
     }
 
     char *orders_link = orders_url();
+    char *unsub_url = email_service_unsubscribe_url(shipped->customer_email);
     char *safe_name = str_escape_html(shipped->customer_name ? shipped->customer_name : "Customer");
     char *safe_tracking = str_escape_html(shipped->tracking_number ? shipped->tracking_number : "");
     char *safe_carrier = str_escape_html(shipped->carrier ? shipped->carrier : "");
@@ -411,24 +523,23 @@ int email_service_send_order_shipped(const EmailOrderShipped *shipped) {
         }
     }
 
-    char *delivery_section = "";
-    bool free_delivery = false;
+    char *delivery_row = str_dup("");
     if (!str_is_empty(shipped->estimated_delivery)) {
-        delivery_section = str_printf(
-            "<li><strong>Estimated delivery:</strong> %s</li>",
+        free(delivery_row);
+        delivery_row = str_printf(
+            "<tr><td style=\"color:#6b7280;width:140px\">Estimated delivery</td><td>%s</td></tr>",
             shipped->estimated_delivery);
-        free_delivery = true;
     }
 
-    char *tracking_button = "";
-    bool free_tracking_button = false;
+    char *tracking_button = str_dup("");
     if (tracking_link != NULL) {
+        free(tracking_button);
         tracking_button = str_printf(
-            "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;"
+            "<p style=\"text-align:center;margin:16px 0\">"
+            "<a href=\"%s\" style=\"display:inline-block;padding:12px 28px;"
             "background:#111827;color:#ffffff;text-decoration:none;"
-            "border-radius:6px\">Track my package</a></p>",
+            "border-radius:8px;font-weight:600\">Track my package</a></p>",
             tracking_link);
-        free_tracking_button = true;
     }
 
     char *subject = str_printf("%s order shipped %s",
@@ -450,30 +561,30 @@ int email_service_send_order_shipped(const EmailOrderShipped *shipped) {
         !str_is_empty(shipped->estimated_delivery) ? shipped->estimated_delivery : "",
         orders_link ? orders_link : email_state.site_url,
         email_state.store_name);
-    char *html_body = str_printf(
-        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
-        "<h2 style=\"margin:0 0 16px\">Your order has been shipped!</h2>"
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">Your order has been shipped!</h2>"
         "<p>Hello %s,</p>"
         "<p>Your order <strong>%s</strong> is on its way.</p>"
-        "<ul>"
-        "<li><strong>Carrier:</strong> %s</li>"
-        "<li><strong>Tracking number:</strong> %s</li>"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+        "<tr><td style=\"padding:16px\">"
+        "<table role=\"presentation\" width=\"100%%\" cellpadding=\"4\" cellspacing=\"0\">"
+        "<tr><td style=\"color:#6b7280;width:140px\">Carrier</td><td>%s</td></tr>"
+        "<tr><td style=\"color:#6b7280\">Tracking</td><td style=\"font-weight:600\">%s</td></tr>"
         "%s"
-        "</ul>"
+        "</table>"
+        "</td></tr></table>"
         "%s"
-        "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;"
-        "background:#6b7280;color:#ffffff;text-decoration:none;"
-        "border-radius:6px;margin-top:8px\">View my orders</a></p>"
-        "<p>%s</p>"
-        "</body></html>",
+        "<p style=\"text-align:center;margin:16px 0\">"
+        "<a href=\"%s\" style=\"display:inline-block;padding:12px 28px;background:#6b7280;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600\">View my orders</a>"
+        "</p>",
         safe_name ? safe_name : "Customer",
         shipped->order_number ? shipped->order_number : "-",
         !str_is_empty(safe_carrier) ? safe_carrier : "-",
         !str_is_empty(safe_tracking) ? safe_tracking : "-",
-        delivery_section,
+        delivery_row,
         tracking_button,
-        orders_link ? orders_link : email_state.site_url,
-        email_state.store_name);
+        orders_link ? orders_link : email_state.site_url);
+    char *html_body = email_wrap_html(inner_html, unsub_url);
 
     BrevoEmailRequest request = {
         .sender_email = email_state.sender_email,
@@ -491,14 +602,16 @@ int email_service_send_order_shipped(const EmailOrderShipped *shipped) {
     int result = email_send(&request);
 
     free(orders_link);
+    free(unsub_url);
     free(safe_name);
     free(safe_tracking);
     free(safe_carrier);
     free(tracking_link);
-    if (free_delivery) free(delivery_section);
-    if (free_tracking_button) free(tracking_button);
+    free(delivery_row);
+    free(tracking_button);
     free(subject);
     free(text_body);
+    free(inner_html);
     free(html_body);
 
     return result;
@@ -510,6 +623,7 @@ int email_service_send_order_status_update(const EmailOrderStatusUpdate *update)
     }
 
     char *orders_link = orders_url();
+    char *unsub_url = email_service_unsubscribe_url(update->customer_email);
     char *safe_name = str_escape_html(update->customer_name ? update->customer_name : "Customer");
     char *human_status_text = humanize_status(update->status);
     char *safe_status = str_escape_html(human_status_text ? human_status_text : update->status);
@@ -526,19 +640,21 @@ int email_service_send_order_status_update(const EmailOrderStatusUpdate *update)
         human_status_text ? human_status_text : "Updated",
         orders_link ? orders_link : email_state.site_url,
         email_state.store_name);
-    char *html_body = str_printf(
-        "<html><body style=\"font-family:Arial,sans-serif;color:#1f2937;line-height:1.6\">"
-        "<h2 style=\"margin:0 0 16px\">Order status updated</h2>"
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">Order status updated</h2>"
         "<p>Hello %s,</p>"
-        "<p>Your order <strong>%s</strong> is now <strong>%s</strong>.</p>"
-        "<p><a href=\"%s\" style=\"display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px\">Open my orders</a></p>"
-        "<p>%s</p>"
-        "</body></html>",
+        "<p>Your order <strong>%s</strong> is now:</p>"
+        "<p style=\"text-align:center;margin:20px 0\">"
+        "<span style=\"display:inline-block;padding:8px 20px;background:#dbeafe;color:#1e40af;border-radius:20px;font-weight:600;font-size:16px\">%s</span>"
+        "</p>"
+        "<p style=\"text-align:center;margin:24px 0\">"
+        "<a href=\"%s\" style=\"display:inline-block;padding:12px 28px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600\">View my orders</a>"
+        "</p>",
         safe_name ? safe_name : "Customer",
         update->order_number ? update->order_number : "-",
         safe_status ? safe_status : "Updated",
-        orders_link ? orders_link : email_state.site_url,
-        email_state.store_name);
+        orders_link ? orders_link : email_state.site_url);
+    char *html_body = email_wrap_html(inner_html, unsub_url);
 
     BrevoEmailRequest request = {
         .sender_email = email_state.sender_email,
@@ -556,11 +672,120 @@ int email_service_send_order_status_update(const EmailOrderStatusUpdate *update)
     int result = email_send(&request);
 
     free(orders_link);
+    free(unsub_url);
     free(safe_name);
     free(human_status_text);
     free(safe_status);
     free(subject);
     free(text_body);
+    free(inner_html);
+    free(html_body);
+
+    return result;
+}
+
+int email_service_send_abandoned_cart(const EmailAbandonedCart *cart) {
+    if (!email_state.initialized || cart == NULL || str_is_empty(cart->customer_email)) {
+        return -1;
+    }
+
+    char total_str[32];
+    snprintf(total_str, sizeof(total_str), "%.2f", cart->cart_total);
+
+    char *cart_link = str_printf("%s/shopping-cart", email_state.site_url);
+    char *unsub_url = email_service_unsubscribe_url(cart->customer_email);
+    char *safe_name = str_escape_html(cart->customer_name ? cart->customer_name : "");
+    char *greeting = !str_is_empty(cart->customer_name)
+        ? str_printf("Hello %s,", safe_name)
+        : str_dup("Hello,");
+
+    char *product_preview = str_dup("");
+    if (!str_is_empty(cart->top_product_name)) {
+        char *safe_product = str_escape_html(cart->top_product_name);
+        free(product_preview);
+        if (!str_is_empty(cart->top_product_image)) {
+            char *safe_img = str_escape_html(cart->top_product_image);
+            product_preview = str_printf(
+                "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+                "<tr><td style=\"padding:16px;text-align:center\">"
+                "<img src=\"%s%s\" alt=\"%s\" style=\"max-width:200px;border-radius:8px;margin-bottom:8px\" />"
+                "<p style=\"margin:0;font-weight:600\">%s</p>"
+                "<p style=\"margin:4px 0 0;color:#6b7280\">%s %d item%s &middot; R$ %s</p>"
+                "</td></tr></table>",
+                email_state.site_url, safe_img,
+                safe_product, safe_product,
+                cart->item_count > 1 ? "+" : "",
+                cart->item_count,
+                cart->item_count > 1 ? "s" : "",
+                total_str);
+            free(safe_img);
+        } else {
+            product_preview = str_printf(
+                "<table role=\"presentation\" width=\"100%%\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:16px 0;border:1px solid #e5e7eb;border-radius:8px\">"
+                "<tr><td style=\"padding:16px;text-align:center\">"
+                "<p style=\"margin:0;font-weight:600\">%s</p>"
+                "<p style=\"margin:4px 0 0;color:#6b7280\">%d item%s &middot; R$ %s</p>"
+                "</td></tr></table>",
+                safe_product,
+                cart->item_count,
+                cart->item_count > 1 ? "s" : "",
+                total_str);
+        }
+        free(safe_product);
+    }
+
+    char *subject = str_printf("You left items in your cart at %s", email_state.store_name);
+    char *text_body = str_printf(
+        "%s\n\n"
+        "You have %d item%s worth R$ %s waiting in your cart.\n\n"
+        "Complete your purchase here: %s\n\n"
+        "%s\n",
+        greeting,
+        cart->item_count,
+        cart->item_count > 1 ? "s" : "",
+        total_str,
+        cart_link ? cart_link : email_state.site_url,
+        email_state.store_name);
+    char *inner_html = str_printf(
+        "<h2 style=\"margin:0 0 16px;color:#111827\">You left something behind!</h2>"
+        "<p>%s</p>"
+        "<p>You have <strong>%d item%s</strong> worth <strong>R$ %s</strong> waiting in your cart.</p>"
+        "%s"
+        "<p style=\"text-align:center;margin:24px 0\">"
+        "<a href=\"%s\" style=\"display:inline-block;padding:14px 32px;background:#111827;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:16px\">Complete my purchase</a>"
+        "</p>"
+        "<p style=\"color:#6b7280;font-size:13px;text-align:center\">Items in your cart are not reserved and may sell out.</p>",
+        greeting,
+        cart->item_count,
+        cart->item_count > 1 ? "s" : "",
+        total_str,
+        product_preview,
+        cart_link ? cart_link : email_state.site_url);
+    char *html_body = email_wrap_html(inner_html, unsub_url);
+
+    BrevoEmailRequest request = {
+        .sender_email = email_state.sender_email,
+        .sender_name = email_state.sender_name,
+        .reply_to_email = email_state.reply_to_email,
+        .reply_to_name = email_state.reply_to_name,
+        .to_email = cart->customer_email,
+        .to_name = cart->customer_name,
+        .subject = subject,
+        .html_content = html_body,
+        .text_content = text_body,
+        .tag = "abandoned-cart"
+    };
+
+    int result = email_send(&request);
+
+    free(cart_link);
+    free(unsub_url);
+    free(safe_name);
+    free(greeting);
+    free(product_preview);
+    free(subject);
+    free(text_body);
+    free(inner_html);
     free(html_body);
 
     return result;

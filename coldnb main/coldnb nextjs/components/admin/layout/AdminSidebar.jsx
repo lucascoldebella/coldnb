@@ -100,6 +100,41 @@ const ShippingIcon = () => (
   </svg>
 );
 
+const DiscountsIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+    <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+);
+
+const NewsletterIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+    <polyline points="22,6 12,13 2,6" />
+  </svg>
+);
+
+const ContactIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+const ReturnsIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="1 4 1 10 7 10" />
+    <path d="M3.51 15a9 9 0 1 0 .49-3.75" />
+  </svg>
+);
+
+const ExportsIcon = () => (
+  <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
 const LogoutIcon = () => (
   <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -135,14 +170,19 @@ export default function AdminSidebar() {
         { path: "/admin/categories", label: "Categories", icon: CategoriesIcon, section: "products" },
         { path: "/admin/inventory", label: "Inventory", icon: InventoryIcon, section: "products" },
         { path: "/admin/orders", label: "Orders", icon: OrdersIcon, section: "orders" },
+        { path: "/admin/returns", label: "Returns", icon: ReturnsIcon, section: "returns" },
         { path: "/admin/shipping", label: "Shipping", icon: ShippingIcon, section: "shipping" },
         { path: "/admin/customers", label: "Customers", icon: CustomersIcon, section: "customers" },
+        { path: "/admin/discounts", label: "Discounts", icon: DiscountsIcon, section: "marketing" },
       ],
     },
     {
       title: "Analytics",
       items: [
         { path: "/admin/marketing", label: "Marketing", icon: MarketingIcon, section: "marketing" },
+        { path: "/admin/newsletter", label: "Newsletter", icon: NewsletterIcon, section: "marketing" },
+        { path: "/admin/contacts", label: "Contacts", icon: ContactIcon, section: "customers" },
+        { path: "/admin/exports", label: "Exports", icon: ExportsIcon, section: "financial" },
       ],
     },
     {

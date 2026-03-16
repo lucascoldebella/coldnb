@@ -1,6 +1,6 @@
 # Coldnb — Complete Codebase & Product Analysis
 
-> Generated: 2026-03-10 | Updated: 2026-03-11 (Sprint 2 complete) | Analyst: Context Engineering Session
+> Generated: 2026-03-10 | Updated: 2026-03-12 (Sprint 4 complete) | Analyst: Context Engineering Session
 
 ---
 
@@ -10,14 +10,14 @@ Coldnb is a full-stack jewelry e-commerce platform built for the Brazilian marke
 
 The platform demonstrates significant technical ambition — a custom C backend for performance, a mature dual-auth architecture, a comprehensive PostgreSQL schema covering the full e-commerce domain, and a production-ready deployment stack on DigitalOcean with Nginx, PM2, systemd, UFW, CrowdSec, and fail2ban. Email transactional flows (order confirmation, status updates, contact notifications) are live.
 
-As of Sprint 2 (2026-03-11), all three original P0 blockers have been resolved: (1) **Stripe payment integration is complete** — backend handlers, PaymentElement checkout (card + PIX), and webhook handling are built (VPS Stripe key config pending); (2) **frontend product browsing is API-driven** — shop/detail/homepage pages fetch from `/api/products`; (3) **cart merge on login** is implemented via `mergeCartOnLogin()` in UserAuthContext.
+As of Sprint 4 (2026-03-12), all three original P0 blockers have been resolved: (1) **Stripe payment integration is complete** — backend handlers, PaymentElement checkout (card + PIX), webhook handling, and guest Stripe payments are built (VPS Stripe key config pending); (2) **frontend product browsing is API-driven** — shop/detail/homepage pages fetch from `/api/products`; (3) **cart merge on login** is implemented via `mergeCartOnLogin()` in UserAuthContext.
 
-Sprint 2 added order tracking (public tracking page + admin tracking upload + shipped email), admin inventory management, and admin customer detail pages.
+Sprint 2 added order tracking (public tracking page + admin tracking upload + shipped email), admin inventory management, and admin customer detail pages. Sprint 3 added product search, password reset, reorder button, discount code pre-validation, guest checkout, and return/refund workflow. Sprint 4 added guest Stripe payments, privacy policy (LGPD), email unsubscribe (HMAC-based), rich HTML email templates, admin discount CRUD, product recommendations, abandoned cart recovery, invoice generation, and a loyalty/rewards program.
 
 **Top 3 recommended next actions:**
-1. Configure Stripe live keys on VPS and verify end-to-end payment flow
+1. Configure Stripe live keys on VPS and apply DB migrations 006–008
 2. Implement SEO meta tags and sitemap generation for organic discovery
-3. Build guest checkout flow (schema supports `user_id NULL` on orders)
+3. Build real-time shipping rate calculation (Correios integration)
 
 ---
 
@@ -111,9 +111,9 @@ coldnb/
 │   │   ├── (homes)/             ← 18 homepage theme variants
 │   │   ├── (products)/          ← 7+ shop listing layouts
 │   │   ├── (productDetails)/    ← 25+ product detail variants
-│   │   ├── (my-account)/        ← Account, addresses, orders (4 pages)
-│   │   ├── (admin)/admin/       ← Admin dashboard (10+ pages)
-│   │   ├── (other-pages)/       ← Cart, checkout, contact, auth (15+ pages)
+│   │   ├── (my-account)/        ← Account, addresses, orders, loyalty (5 pages)
+│   │   ├── (admin)/admin/       ← Admin dashboard (12+ pages)
+│   │   ├── (other-pages)/       ← Cart, checkout, contact, auth, privacy, unsubscribe, invoice (18+ pages)
 │   │   ├── (blogs)/             ← Blog pages (4 layouts)
 │   │   ├── api/admin/upload/    ← Image upload API route
 │   │   └── layout.js            ← Root layout
@@ -126,14 +126,14 @@ coldnb/
 │   │   ├── products/            ← Filters, grid, list views
 │   │   └── common/              ← Shared components
 │   ├── context/                 ← 5 React Contexts
-│   ├── lib/                     ← adminApi.js + i18n system
+│   ├── lib/                     ← adminApi.js, shopApi.js, loyaltyApi.js, adminDiscounts.js + i18n system
 │   ├── data/                    ← Static data files (products 133KB, etc.)
 │   ├── public/scss/             ← Bootstrap + 31 SCSS partials
 │   └── utlis/                   ← Utility functions (typo intentional)
 │
 └── coldnb-backend/              ← BACKEND (C)
     ├── src/
-    │   ├── handlers/            ← ~12 handler files
+    │   ├── handlers/            ← ~16 handler files
     │   ├── services/            ← svc_email, svc_jwt, svc_admin_auth
     │   ├── clients/             ← client_brevo, client_stripe
     │   ├── db/                  ← db_connection (pool), db_query
@@ -143,7 +143,7 @@ coldnb/
     │   ├── http/                ← http_server, http_router, http_request, http_response
     │   └── main.c               ← Entry point, route registration
     ├── include/                 ← Header files (mirrors src/)
-    ├── sql/                     ← 6 migration files (001–006)
+    ├── sql/                     ← 8 migration files (001–008)
     ├── config/                  ← server.conf + secrets/ directory
     ├── scripts/                 ← dev_setup.sh, setup_production.sh
     └── Makefile
@@ -210,6 +210,16 @@ graph LR
 **analytics_page_views / analytics_product_views** — Built-in analytics (session_id, user_id, path, product_id)
 
 **admin_sessions** — Admin JWT tracking (token_hash, ip_address, expires_at)
+
+**order_returns** — Return requests (order_id, user_id, reason, description, status [requested/under_review/approved/rejected/refunded], admin_notes, refund_amount)
+
+**abandoned_cart_emails** — Recovery email tracking (user_id, sent_at; one per user per cooldown period)
+
+**loyalty_points** — Points ledger (user_id, points [positive=earned, negative=spent], reason, reference_type, reference_id)
+
+**loyalty_rewards** — Rewards catalog (name, description, points_cost, reward_type, reward_value, is_active)
+
+**loyalty_redemptions** — Redemption records (user_id, reward_id, points_spent, discount_code, redeemed_at)
 
 ```mermaid
 erDiagram
@@ -343,7 +353,11 @@ sequenceDiagram
     BE->>B: Send order confirmation email (customer)
     BE->>B: Send new order alert (internal)
     BE-->>FE: {order_id, order_number, total}
-    Note over BE,S: ⚠️ Stripe payment initiation INCOMPLETE
+    FE->>BE: POST /api/payments/create-intent {order_id}
+    BE->>S: Create PaymentIntent (amount, currency)
+    BE-->>FE: {client_secret}
+    FE->>S: Confirm payment (PaymentElement)
+    S-->>FE: Payment result
     FE->>C: Show order confirmation page
 ```
 
@@ -414,8 +428,8 @@ sequenceDiagram
 | Product listing pages | ✅ Done | UI complete (7+ layouts); API-driven via `lib/shopApi.js` |
 | Product detail pages | ✅ Done | UI complete (25+ variants); API-driven via `lib/shopApi.js` |
 | Category management | ✅ Done | Schema + backend handlers + admin UI |
-| Search functionality | ⬜ Not Started | No search; client-side filter on static data only |
-| Product recommendations | ⬜ Not Started | No related products logic |
+| Search functionality | ✅ Done | `/search-result?q=` wired to `GET /api/products/search` |
+| Product recommendations | ✅ Done | `GET /api/products/:id/recommendations` (co-purchased + same category); RelatedProducts.jsx |
 | Inventory status display | 🔄 Partial | `stock_quantity` in DB; not surfaced to customer UI |
 
 ### Cart & Checkout
@@ -425,11 +439,11 @@ sequenceDiagram
 | Add to cart, update quantity, remove | ✅ Done | localStorage cart fully functional in UI |
 | Server-side cart (authenticated) | ✅ Done | DB table + backend handlers; not synced with localStorage |
 | Cart merge on login | ✅ Done | `mergeCartOnLogin()` in UserAuthContext reconciles localStorage → server on login |
-| Guest checkout | ⬜ Not Started | Schema supports NULL user_id on orders; UI flow not built |
+| Guest checkout | ✅ Done | `POST /api/guest-orders` (no auth); guest Stripe payments via `POST /api/guest-payments/create-intent` |
 | Shipping address input & validation | ✅ Done | Checkout UI + user_addresses DB table |
 | Saved address management | ✅ Done | `/my-account-address` page + backend handlers |
 | Shipping method selection | 🔄 Partial | Schema exists (shipping_zones SQL); UI exists; no real rate calculation |
-| Coupon/promo code application | 🔄 Partial | DB schema + backend validation; frontend checkout UI connection unknown |
+| Coupon/promo code application | ✅ Done | DB schema + backend validation + `GET /api/discount-codes/check` pre-validation + admin CRUD UI |
 | Order summary review | ✅ Done | Checkout UI shows cart items, subtotal, shipping |
 | Multi-step checkout flow | ✅ Done | Checkout page with address → payment steps |
 
@@ -442,7 +456,7 @@ sequenceDiagram
 | PIX / Boleto (Brazilian market) | ✅ Done | PIX enabled via Stripe PaymentElement |
 | Apple Pay / Google Pay | ⬜ Not Started | |
 | Payment failure handling | ⬜ Not Started | No retry flow |
-| Refunds | ⬜ Not Started | No refund workflow |
+| Refunds | ✅ Done | Return/refund workflow: customer request → admin review → approve/reject → refund |
 | Fraud detection | ⬜ Not Started | |
 
 ### Order Management
@@ -455,7 +469,7 @@ sequenceDiagram
 | Admin order dashboard | ✅ Done | List, filter, view orders in admin |
 | Admin order status updates | ✅ Done | `PUT /api/admin/orders/:id/status` + email notification |
 | Order tracking page | ✅ Done | `/order-tracking` → `GET /api/track-order` with visual timeline, tracking info, items, history |
-| Order cancellation | 🔄 Partial | Status flow supports cancelled; no customer-initiated cancel UI |
+| Order cancellation | ✅ Done | Customer: `PUT /api/orders/:id/cancel` (pending/processing only); Admin: any status via status update |
 | Order editing | ⬜ Not Started | |
 
 ### Post-Sale & Fulfillment
@@ -466,9 +480,9 @@ sequenceDiagram
 | Internal new-order alert | ✅ Done | Sent to `email@coldnb.com` on order creation |
 | Order status update email | ✅ Done | Sent to customer when admin updates status |
 | Shipping confirmation + tracking | ✅ Done | `PUT /api/admin/orders/:id/tracking` → sets tracking info, sends shipped email with carrier URL |
-| Return/exchange workflow | ⬜ Not Started | |
-| Refund notification | ⬜ Not Started | |
-| Invoice/receipt PDF | ⬜ Not Started | |
+| Return/exchange workflow | ✅ Done | Customer form (`POST /api/returns`) + admin review (`PUT /api/admin/returns/:id/status`) |
+| Refund notification | 🔄 Partial | Status update email covers refund status; no dedicated refund email |
+| Invoice/receipt page | ✅ Done | `/invoice/[id]` print-optimized page; CSS @media print; "Save as PDF" via browser |
 
 ### Customer Accounts
 
@@ -476,12 +490,14 @@ sequenceDiagram
 |---------|--------|-------|
 | Registration + login (email/password) | ✅ Done | Supabase Auth; `/login`, `/register` pages |
 | OAuth / social login | ⬜ Not Started | Supabase supports it; not wired in frontend |
-| Password reset | 🔄 Partial | `/forget-password` page exists; Supabase flow; needs verification |
+| Password reset | ✅ Done | Supabase `resetPasswordForEmail()` + `/reset-password` callback page |
 | Profile management | ✅ Done | `/my-account` page |
 | Saved addresses | ✅ Done | `/my-account-address` + backend CRUD |
 | Order history | ✅ Done | `/my-account-orders` |
 | Wishlist | ✅ Done | UI complete (localStorage); server-side exists |
-| Account deletion / GDPR | ⬜ Not Started | |
+| Account deletion | ✅ Done | Two-step confirmation in ClientPanel.jsx; `DELETE /api/user/profile` |
+| Return status page | ✅ Done | `/my-account-returns` with status badges, both sidebars updated |
+| GDPR data export | ⬜ Not Started | `GET /api/users/me/export` not yet built |
 
 ### Email & Notifications
 
@@ -492,8 +508,8 @@ sequenceDiagram
 | Status update template | ✅ Done | Sent via Brevo |
 | Contact notification template | ✅ Done | Sent to internal inbox |
 | Password reset / welcome email | ✅ Done | Via Supabase → Brevo SMTP |
-| Rich HTML email templates | ⬜ Not Started | Current templates are plain/minimal |
-| Email preference management / unsubscribe | ⬜ Not Started | |
+| Rich HTML email templates | ✅ Done | Branded wrapper (`email_wrap_html()`): dark header, white body, gray footer with unsubscribe |
+| Email preference management / unsubscribe | ✅ Done | HMAC-SHA256 signed one-click unsubscribe links; `/unsubscribe` frontend page |
 | SMS / WhatsApp notifications | ⬜ Not Started | |
 
 ### Admin & Operations Panel
@@ -505,10 +521,12 @@ sequenceDiagram
 | Image upload | ✅ Done | `POST /api/admin/upload` → `public/uploads/products/` |
 | Order management dashboard | ✅ Done | List, filter, status updates |
 | Customer management | ✅ Done | List page + detail page (`/admin/customers/[id]`) with profile, stats, order history |
-| Coupon management | 🔄 Partial | Schema complete; admin CRUD UI extent unknown |
+| Coupon management | ✅ Done | Full admin CRUD at `/admin/discounts` — list, create, edit, delete, active toggle |
 | Analytics dashboard | ✅ Done | Revenue, orders, top products charts (Chart.js) |
 | Email operations page | ✅ Done | `/admin/email` — architecture reference, config display |
 | Inventory management (low stock) | ✅ Done | `/admin/inventory` — stats cards, filters, inline stock editing, color-coded badges |
+| Newsletter subscriber management | ✅ Done | `/admin/newsletter` — subscriber table, status filter, delete action |
+| Contact submissions management | ✅ Done | `/admin/contacts` — submissions table, read/unread filter, view modal, mark-as-read |
 | Content management (homepage) | 🔄 Partial | `003_homepage_content.sql` exists; admin UI unknown |
 | Reporting exports | ⬜ Not Started | |
 
@@ -521,7 +539,7 @@ sequenceDiagram
 | Carrier integration (Correios) | ⬜ Not Started | |
 | Tracking number + tracking page | ✅ Done | DB columns + admin upload + public tracking page + shipped email |
 | Shipping label generation | ⬜ Not Started | |
-| Free shipping threshold | 🔄 Partial | DB supports it; no UI enforcement logic |
+| Free shipping threshold | ✅ Done | R$ 75+ gets free shipping in Checkout.jsx; green congratulations message |
 
 ### SEO & Marketing
 
@@ -529,16 +547,16 @@ sequenceDiagram
 |---------|--------|-------|
 | SEO-friendly slugs | ✅ Done | All products and categories have slug fields |
 | Meta tags / Open Graph | ⬜ Not Started | No meta tags on product pages |
-| Sitemap generation | ⬜ Not Started | |
+| Sitemap generation | ✅ Done | Dynamic `app/sitemap.js` — static pages + all product URLs from API |
 | Newsletter signup | ✅ Done | Footer + modal → `POST /api/newsletter/subscribe` (Brevo sync) |
-| Abandoned cart recovery | ⬜ Not Started | |
-| Loyalty/rewards program | ⬜ Not Started | |
+| Abandoned cart recovery | ✅ Done | Admin-triggered recovery emails; 3-day cooldown; eligible = idle >24h, no recent order |
+| Loyalty/rewards program | ✅ Done | Points ledger, rewards catalog, redemption → discount codes; admin CRUD + manual grants; auto-award on delivery (1pt/R$1); `/my-account-loyalty` |
 
 ### Performance & Infrastructure
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Image optimization | 🔄 Partial | Next.js Image component available; not used everywhere |
+| Image optimization | ✅ Done | Next.js `<Image>` used consistently; remaining raw `<img>` tags fixed in OrderTrac + AccountSidebar |
 | CDN | ⬜ Not Started | Assets served directly from VPS |
 | Caching (Redis/edge) | ⬜ Not Started | No caching layer |
 | Mobile responsiveness | ✅ Done | Bootstrap responsive grid; mobile-first |
@@ -555,7 +573,7 @@ sequenceDiagram
 | Rate limiting | ✅ Done | Backend middleware active |
 | Threat blocking | ✅ Done | CrowdSec + fail2ban + UFW |
 | Input validation | 🔄 Partial | Present in handlers; coverage not audited |
-| LGPD / GDPR compliance | ⬜ Not Started | No cookie consent, no data export, no deletion flow |
+| LGPD / GDPR compliance | 🔄 Partial | Cookie consent banner + privacy policy page + email unsubscribe + account deletion with confirmation; no data export yet |
 | Dependency vulnerability scanning | ⬜ Not Started | No automated scanning |
 
 ---
@@ -601,29 +619,29 @@ sequenceDiagram
 **P2.1 — Order Tracking Page** ✅ RESOLVED (Sprint 2)
 - Full tracking page with visual timeline, tracking info, items, history. Public endpoint at `GET /api/track-order`.
 
-**P2.2 — Guest Checkout**
-- Schema supports `user_id NULL` on orders. Build the guest → order flow (no auth required for purchase).
+**P2.2 — Guest Checkout** ✅ RESOLVED (Sprint 3)
+- `POST /api/guest-orders` + guest Stripe payments via `POST /api/guest-payments/create-intent`.
 
 **P2.3 — Inventory Management UI** ✅ RESOLVED (Sprint 2)
 - Full dashboard at `/admin/inventory` with stats cards, filters, inline stock editing, color-coded badges.
 
-**P2.4 — Rich Email Templates**
-- Current Brevo emails are plain/minimal. Build branded HTML templates for order confirmation and status updates.
+**P2.4 — Rich Email Templates** ✅ RESOLVED (Sprint 4)
+- Branded HTML wrapper with dark header, white body, gray footer, unsubscribe links. All 5 email types upgraded.
 
 **P2.5 — Social Login (OAuth)**
 - Supabase supports Google/GitHub OAuth. Add buttons to `/login` and `/register`.
 
-**P2.6 — Sitemap Generation**
-- Add `app/sitemap.js` using Next.js built-in sitemap support with product slugs from API.
+**P2.6 — Sitemap Generation** ✅ RESOLVED (Sprint 5)
+- Dynamic `app/sitemap.js` with static pages + all product URLs from API.
 
 ### P3 — Nice to Have
 
-- Product full-text search (PostgreSQL `tsvector` or Meilisearch)
-- Abandoned cart recovery emails
-- Product recommendations (related items, frequently bought together)
-- Invoice/receipt PDF generation (via Puppeteer or WeasyPrint)
+- ~~Product full-text search~~ ✅ RESOLVED (Sprint 3) — `/search-result?q=` → `GET /api/products/search`
+- ~~Abandoned cart recovery emails~~ ✅ RESOLVED (Sprint 4) — Admin-triggered with 3-day cooldown
+- ~~Product recommendations~~ ✅ RESOLVED (Sprint 4) — Co-purchased + same category engine
+- ~~Invoice/receipt PDF generation~~ ✅ RESOLVED (Sprint 4) — Print-optimized page (no PDF library)
 - Image CDN (Cloudflare Images or AWS S3 + CloudFront)
-- Loyalty/rewards program
+- ~~Loyalty/rewards program~~ ✅ RESOLVED (Sprint 4) — Points, rewards catalog, redemption → discount codes
 - Shipping label generation
 
 ---
@@ -637,8 +655,8 @@ sequenceDiagram
 | Dead homepage themes | `app/(homes)/` | 17 unused themes inflate bundle and maintenance burden | Medium | Delete all but the production homepage; keep only active theme |
 | Dead product detail variants | `app/(productDetails)/` | 24 unused variants inflate bundle | Medium | Audit which is in production use; delete rest |
 | ~~EmailJS in contact forms~~ | ~~`components/otherPages/Contact*.jsx`~~ | ~~RESOLVED~~ | ~~RESOLVED~~ | Contact forms now use `POST /api/contact` |
-| Placeholder data | `Footer1.jsx`, store location pages | "themesflat@gmail.com", New York coordinates | Medium | Replace with real contact info and store location |
-| `reducer/` directory | `coldnb main/coldnb nextjs/reducer/` | Empty; no reducers; dead directory | Low | Delete |
+| Placeholder data | Store location pages | New York Google Maps coordinates; needs real store address | Medium | Replace with real store location |
+| `reducer/` directory | `coldnb main/coldnb nextjs/reducer/` | Contains `filterReducer.js` (active, used by 15 Products components) | None | Not dead — leave as-is |
 | `utlis/` typo | `coldnb main/coldnb nextjs/utlis/` | Typo; all imports reference it; cannot rename without mass refactor | Low | Document; do not rename |
 
 ---
@@ -658,13 +676,13 @@ sequenceDiagram
 | CORS | ✅ Configured | Whitelist in server.conf (not wildcard) |
 | Use-after-free (JSON) | ✅ Fixed | Bug in 3 handlers fixed; copy strings before `cJSON_Delete()` |
 | `is_valid_path()` bug | ✅ Fixed | Broken `memchr` null-byte check removed |
-| LGPD / GDPR | 🔄 Partial | Cookie consent banner implemented; no data export; no deletion workflow |
+| LGPD / GDPR | 🔄 Partial | Cookie consent + privacy policy + email unsubscribe + account deletion with confirmation; no data export |
 | Dependency scanning | ⬜ Not Started | No automated `npm audit` or C dependency auditing in CI |
 | SQL injection | ✅ Protected | Parameterized queries via libpq (`$1, $2, ...`) |
 | Stripe | 🔄 VPS config pending | Backend code complete; VPS needs live keys configured before processing payments |
 
 **Critical Remediation Items:**
-1. Implement LGPD cookie consent before any real user data collection
+1. ~~Implement LGPD cookie consent~~ ✅ Done — cookie consent + privacy policy + unsubscribe implemented
 2. Add automated `npm audit` check in deploy pipeline
 3. Audit all backend handlers for input length validation and edge cases
 
@@ -677,32 +695,55 @@ gantt
     title Coldnb E-commerce Platform Roadmap
     dateFormat  YYYY-MM-DD
 
-    section Phase 1 — Production Readiness
-    Stripe payment flow (intent, confirm, webhook)   :p1a, 2026-03-11, 14d
-    Frontend product API connection                  :p1b, 2026-03-11, 10d
-    Cart merge on login                              :p1c, after p1b, 5d
-    Newsletter wiring                                :p1d, 2026-03-15, 3d
-    Contact form backend wiring                      :p1e, 2026-03-15, 2d
-    PIX payment method                               :p1f, after p1a, 7d
-    LGPD cookie consent                              :p1g, 2026-03-18, 5d
+    section Sprint 1 — Production Readiness ✅
+    Stripe payment flow (card + PIX)                 :done, p1a, 2026-03-10, 1d
+    Frontend product API connection                  :done, p1b, 2026-03-10, 1d
+    Cart merge on login                              :done, p1c, 2026-03-10, 1d
+    Newsletter wiring                                :done, p1d, 2026-03-10, 1d
+    Contact form backend wiring                      :done, p1e, 2026-03-10, 1d
+    LGPD cookie consent                              :done, p1g, 2026-03-10, 1d
 
-    section Phase 2 — Growth Features
-    Order tracking page                              :p2a, after p1c, 5d
-    Rich email templates (HTML)                      :p2b, after p1e, 7d
-    Guest checkout flow                              :p2c, after p1a, 10d
-    Shipping rate calculation (Correios)             :p2d, 2026-04-01, 14d
-    SEO meta tags + sitemap                          :p2e, 2026-04-01, 5d
-    Inventory management UI                          :p2f, 2026-04-05, 7d
-    Social login (OAuth)                             :p2g, 2026-04-10, 5d
+    section Sprint 2 — Order Operations ✅
+    Order tracking page                              :done, p2a, 2026-03-11, 1d
+    Admin tracking upload + shipped email            :done, p2b, 2026-03-11, 1d
+    Admin inventory page                             :done, p2c, 2026-03-11, 1d
+    Admin customer detail page                       :done, p2d, 2026-03-11, 1d
 
-    section Phase 3 — Scale & Optimize
-    Product full-text search                         :p3a, 2026-04-20, 10d
-    Image CDN (Cloudflare / S3)                      :p3b, 2026-04-20, 7d
-    Abandoned cart recovery                          :p3c, 2026-04-25, 7d
-    Product recommendations                          :p3d, 2026-05-01, 10d
-    Invoice PDF generation                           :p3e, 2026-05-05, 7d
-    Loyalty/rewards program                          :p3f, 2026-05-15, 14d
-    Dead code cleanup (unused themes/variants)       :p3g, 2026-05-01, 5d
+    section Sprint 3 — Core Functionality ✅
+    Product search                                   :done, p3a, 2026-03-12, 1d
+    Password reset flow                              :done, p3b, 2026-03-12, 1d
+    Guest checkout                                   :done, p3c, 2026-03-12, 1d
+    Return/refund workflow                           :done, p3d, 2026-03-12, 1d
+    Discount code pre-validation                     :done, p3e, 2026-03-12, 1d
+
+    section Sprint 4 — Fundamentals & Polish ✅
+    Guest Stripe payments                            :done, p4a, 2026-03-12, 1d
+    Privacy policy (LGPD)                            :done, p4b, 2026-03-12, 1d
+    Email unsubscribe + rich templates               :done, p4c, 2026-03-12, 1d
+    Admin discount CRUD                              :done, p4d, 2026-03-12, 1d
+    Product recommendations                          :done, p4e, 2026-03-12, 1d
+    Abandoned cart recovery                          :done, p4f, 2026-03-12, 1d
+    Invoice generation                               :done, p4g, 2026-03-12, 1d
+    Loyalty/rewards program                          :done, p4h, 2026-03-12, 1d
+
+    section Sprint 5 — Core Gaps ✅
+    Free shipping threshold                          :done, p5a, 2026-03-12, 1d
+    Stock status + sold-out badge                    :done, p5b, 2026-03-12, 1d
+    Account deletion confirmation                    :done, p5c, 2026-03-12, 1d
+    Customer order cancellation                      :done, p5d, 2026-03-12, 1d
+    Loyalty auto-award on delivery                   :done, p5e, 2026-03-12, 1d
+    Newsletter admin page                            :done, p5f, 2026-03-12, 1d
+    Contact submissions admin page                   :done, p5g, 2026-03-12, 1d
+    Product form is_new/is_sale flags                :done, p5h, 2026-03-12, 1d
+    Return status page                               :done, p5i, 2026-03-12, 1d
+    Dynamic sitemap                                  :done, p5j, 2026-03-12, 1d
+    Image optimization                               :done, p5k, 2026-03-12, 1d
+
+    section Sprint 6+ — Remaining
+    SEO meta tags + Open Graph                       :p6a, 2026-03-15, 5d
+    Shipping rate calculation (Correios)             :p6b, 2026-03-20, 14d
+    Social login (OAuth)                             :p6c, 2026-03-25, 5d
+    GDPR data export                                 :p6d, 2026-03-28, 3d
 ```
 
 ---
@@ -725,6 +766,16 @@ gantt
 | Admin inventory page | `coldnb main/coldnb nextjs/app/(admin)/admin/inventory/page.jsx` |
 | Admin customer detail page | `coldnb main/coldnb nextjs/app/(admin)/admin/customers/[id]/page.jsx` |
 | Order tracking (public) | `coldnb main/coldnb nextjs/components/otherPages/OrderTrac.jsx` |
+| Customer Axios instance (Supabase JWT) | `coldnb main/coldnb nextjs/lib/userApi.js` |
+| Shop API (product transforms) | `coldnb main/coldnb nextjs/lib/shopApi.js` |
+| Product card (listing grids) | `coldnb main/coldnb nextjs/components/productCards/ProductCard1.jsx` |
+| Admin newsletter page | `coldnb main/coldnb nextjs/app/(admin)/admin/newsletter/page.jsx` |
+| Admin contacts page | `coldnb main/coldnb nextjs/app/(admin)/admin/contacts/page.jsx` |
+| Customer returns page | `coldnb main/coldnb nextjs/app/(my-account)/my-account-returns/page.jsx` |
+| Customer returns component | `coldnb main/coldnb nextjs/components/my-account/MyReturns.jsx` |
+| Account sidebar (desktop) | `coldnb main/coldnb nextjs/components/my-account/AccountSidebar.jsx` |
+| Account sidebar (mobile) | `coldnb main/coldnb nextjs/components/modals/AccountSidebar.jsx` |
+| Dynamic sitemap | `coldnb main/coldnb nextjs/app/sitemap.js` |
 | Cart modal | `coldnb main/coldnb nextjs/components/modals/CartModal.jsx` |
 | Cart utility trigger | `coldnb main/coldnb nextjs/utlis/openCartModal.js` |
 | Backend entry + route registration | `coldnb-backend/src/main.c` |
@@ -733,6 +784,7 @@ gantt
 | Order handler | `coldnb-backend/src/handlers/handler_orders.c` |
 | Admin order handler | `coldnb-backend/src/handlers/handler_admin_orders.c` |
 | Contact handler | `coldnb-backend/src/handlers/handler_contact.c` |
+| Newsletter handler (admin) | `coldnb-backend/src/handlers/handler_newsletter.c` |
 | Admin auth handler | `coldnb-backend/src/handlers/handler_admin.c` |
 | Admin analytics handler | `coldnb-backend/src/handlers/handler_admin_analytics.c` |
 | Email service (abstraction) | `coldnb-backend/src/services/svc_email.c` |
@@ -741,7 +793,15 @@ gantt
 | Supabase JWT validation | `coldnb-backend/src/auth/auth_supabase.c` |
 | DB connection pool | `coldnb-backend/src/db/db_connection.c` |
 | Rate limiting middleware | `coldnb-backend/src/middleware/middleware_rate_limit.c` |
+| Newsletter + unsubscribe handler | `coldnb-backend/src/handlers/handler_newsletter.c` |
+| Abandoned cart handler | `coldnb-backend/src/handlers/handler_abandoned_cart.c` |
+| Loyalty handler | `coldnb-backend/src/handlers/handler_loyalty.c` |
+| Discount admin handler | `coldnb-backend/src/handlers/handler_discounts.c` |
+| Guest orders handler | `coldnb-backend/src/handlers/handler_guest_orders.c` |
+| Returns handler | `coldnb-backend/src/handlers/handler_returns.c` |
 | Order tracking migration | `coldnb-backend/sql/006_order_tracking.sql` |
+| Guest checkout + returns migration | `coldnb-backend/sql/007_guest_checkout_and_returns.sql` |
+| Abandoned cart + loyalty migration | `coldnb-backend/sql/008_abandoned_cart_and_loyalty.sql` |
 | Initial database schema | `coldnb-backend/sql/001_initial_schema.sql` |
 | Admin permissions schema | `coldnb-backend/sql/002_admin_permissions.sql` |
 | Backend configuration | `coldnb-backend/config/server.conf` |
@@ -749,3 +809,13 @@ gantt
 | DB sync script | `coldnb/scripts/db-sync.sh` |
 | Admin password generator | `coldnb-backend/src/scripts/generate_admin_password.c` |
 | Supabase SMTP setup guide | `coldnb-backend/docs/SUPABASE_BREVO_SMTP_SETUP.md` |
+| Shop API client (products) | `coldnb main/coldnb nextjs/lib/shopApi.js` |
+| Loyalty API client | `coldnb main/coldnb nextjs/lib/api/loyaltyApi.js` |
+| Admin discounts API client | `coldnb main/coldnb nextjs/lib/api/adminDiscounts.js` |
+| Privacy policy page | `coldnb main/coldnb nextjs/app/(other-pages)/privacy-policy/page.jsx` |
+| Unsubscribe page | `coldnb main/coldnb nextjs/app/(other-pages)/unsubscribe/page.jsx` |
+| Invoice page (print-optimized) | `coldnb main/coldnb nextjs/app/(other-pages)/invoice/[id]/page.jsx` |
+| Loyalty dashboard page | `coldnb main/coldnb nextjs/app/(my-account)/my-account-loyalty/page.jsx` |
+| Loyalty dashboard component | `coldnb main/coldnb nextjs/components/my-account/LoyaltyDashboard.jsx` |
+| Admin discounts page | `coldnb main/coldnb nextjs/app/(admin)/admin/discounts/page.jsx` |
+| Account sidebar (with loyalty) | `coldnb main/coldnb nextjs/components/my-account/AccountSidebar.jsx` |

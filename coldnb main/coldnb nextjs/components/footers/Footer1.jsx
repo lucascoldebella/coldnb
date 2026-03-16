@@ -69,7 +69,7 @@ export default function Footer1({
       items: [
         { label: t("footer.shipping"), href: "#", isLink: false },
         { label: t("footer.returnRefund"), href: "#", isLink: false },
-        { label: t("footer.privacyPolicy"), href: "#", isLink: false },
+        { label: t("footer.privacyPolicy"), href: "/privacy-policy", isLink: true },
         { label: t("footer.termsConditions"), href: "/term-of-use", isLink: true },
         { label: t("footer.ordersFaqs"), href: "#", isLink: false },
         { label: t("footer.myWishlist"), href: "/wish-list", isLink: true },

@@ -64,6 +64,7 @@ async function getProduct(id) {
 export async function generateMetadata({ params }) {
   const { id } = await params;
   const product = await getProduct(id);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coldnb.com";
 
   if (!product) {
     return {
@@ -71,14 +72,36 @@ export async function generateMetadata({ params }) {
     };
   }
 
+  const title = `${product.title} - Coldnb`;
+  const description = (product.shortDescription || product.description || "Handcrafted jewelry by Coldnb").slice(0, 160);
+  const imageUrl = product.imgSrc?.startsWith("http") ? product.imgSrc : `${siteUrl}${product.imgSrc}`;
+  const productUrl = `${siteUrl}/product-detail/${id}`;
+
   return {
-    title: `${product.title} - Coldnb`,
-    description: product.shortDescription || product.description || "View product details",
+    title,
+    description,
+    alternates: { canonical: productUrl },
+    openGraph: {
+      title,
+      description,
+      url: productUrl,
+      siteName: "Coldnb",
+      images: [{ url: imageUrl, width: 800, height: 800, alt: product.title }],
+      type: "website",
+      locale: "pt_BR",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl],
+    },
   };
 }
 
 export default async function ProductDetailPage({ params }) {
   const { id } = await params;
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://coldnb.com";
 
   // Fetch product from database
   const product = await getProduct(id);
@@ -88,14 +111,41 @@ export default async function ProductDetailPage({ params }) {
     notFound();
   }
 
+  const imageUrl = product.imgSrc?.startsWith("http") ? product.imgSrc : `${siteUrl}${product.imgSrc}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.shortDescription || product.description || "",
+    image: imageUrl,
+    sku: product.sku || "",
+    brand: { "@type": "Brand", name: product.brand || "Coldnb" },
+    category: product.category,
+    offers: {
+      "@type": "Offer",
+      url: `${siteUrl}/product-detail/${id}`,
+      priceCurrency: "BRL",
+      price: product.price.toFixed(2),
+      availability: product.stock > 0
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+      seller: { "@type": "Organization", name: "Coldnb" },
+    },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Topbar6 bgColor="bg-main" />
       <Header1 />
       <Breadcumb product={product} />
       <Details1 product={product} />
       <Descriptions1 />
-      <RelatedProducts />
+      <RelatedProducts productId={product.id} />
       <Footer1 hasPaddingBottom />
     </>
   );

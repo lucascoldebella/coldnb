@@ -12,6 +12,7 @@ void handler_user_register(HttpRouter *router, DbPool *pool) {
     ROUTE_GET(router, "/api/user/profile", handler_user_profile_get, pool);
     ROUTE_PUT(router, "/api/user/profile", handler_user_profile_update, pool);
     ROUTE_DELETE(router, "/api/user/profile", handler_user_profile_delete, pool);
+    ROUTE_GET(router, "/api/user/export", handler_user_data_export, pool);
 }
 
 void handler_user_profile_get(HttpRequest *req, HttpResponse *resp, void *user_data) {
@@ -199,4 +200,105 @@ void handler_user_profile_delete(HttpRequest *req, HttpResponse *resp, void *use
     db_pool_release(pool, conn);
 
     http_response_success(resp, "{\"message\":\"Account deleted\"}");
+}
+
+void handler_user_data_export(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *user_id = auth_get_user_id(req);
+
+    if (user_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_UNAUTHORIZED, "Authentication required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    cJSON *export_data = cJSON_CreateObject();
+    cJSON_AddStringToObject(export_data, "export_date", "");
+    cJSON_AddStringToObject(export_data, "type", "gdpr_data_export");
+
+    /* Profile */
+    const char *profile_query =
+        "SELECT id, email, full_name, phone, avatar_url, email_verified, created_at "
+        "FROM users WHERE id = $1 OR supabase_id = $1";
+    const char *params[] = { user_id };
+    PGresult *profile_result = db_exec_params(conn, profile_query, 1, params);
+
+    if (db_result_ok(profile_result) && db_result_has_rows(profile_result)) {
+        DbRow row = { .result = profile_result, .row = 0 };
+        cJSON_AddItemToObject(export_data, "profile", db_row_to_json(&row));
+    }
+    PQclear(profile_result);
+
+    /* Addresses */
+    const char *addr_query =
+        "SELECT id, label, recipient_name, phone, street_address, street_address_2, "
+        "city, state, postal_code, country, is_default, created_at "
+        "FROM user_addresses WHERE user_id = $1 OR user_id IN "
+        "(SELECT id FROM users WHERE supabase_id = $1) "
+        "ORDER BY is_default DESC, created_at DESC";
+    PGresult *addr_result = db_exec_params(conn, addr_query, 1, params);
+    if (db_result_ok(addr_result)) {
+        cJSON_AddItemToObject(export_data, "addresses", db_result_to_json(addr_result));
+    }
+    PQclear(addr_result);
+
+    /* Orders */
+    const char *orders_query =
+        "SELECT o.id, o.order_number, o.status, o.payment_status, o.payment_method, "
+        "o.subtotal, o.shipping_cost, o.discount_amount, o.total, o.notes, "
+        "o.shipping_name, o.shipping_city, o.shipping_state, o.shipping_postal_code, "
+        "o.tracking_number, o.carrier, o.created_at "
+        "FROM orders o "
+        "JOIN users u ON o.user_id = u.id "
+        "WHERE u.id = $1 OR u.supabase_id = $1 "
+        "ORDER BY o.created_at DESC";
+    PGresult *orders_result = db_exec_params(conn, orders_query, 1, params);
+    if (db_result_ok(orders_result)) {
+        cJSON_AddItemToObject(export_data, "orders", db_result_to_json(orders_result));
+    }
+    PQclear(orders_result);
+
+    /* Wishlist */
+    const char *wish_query =
+        "SELECT w.product_id, p.name AS product_name, w.created_at "
+        "FROM wishlist_items w "
+        "JOIN products p ON w.product_id = p.id "
+        "WHERE w.user_id = $1 OR w.user_id IN "
+        "(SELECT id FROM users WHERE supabase_id = $1) "
+        "ORDER BY w.created_at DESC";
+    PGresult *wish_result = db_exec_params(conn, wish_query, 1, params);
+    if (db_result_ok(wish_result)) {
+        cJSON_AddItemToObject(export_data, "wishlist", db_result_to_json(wish_result));
+    }
+    PQclear(wish_result);
+
+    /* Loyalty points */
+    const char *loyalty_query =
+        "SELECT points, reason, reference_id, created_at "
+        "FROM loyalty_points "
+        "WHERE user_id IN (SELECT id FROM users WHERE id = $1 OR supabase_id = $1) "
+        "ORDER BY created_at DESC";
+    PGresult *loyalty_result = db_exec_params(conn, loyalty_query, 1, params);
+    if (db_result_ok(loyalty_result)) {
+        cJSON_AddItemToObject(export_data, "loyalty_points", db_result_to_json(loyalty_result));
+    }
+    PQclear(loyalty_result);
+
+    db_pool_release(pool, conn);
+
+    cJSON *response = json_create_success(export_data);
+    char *json = cJSON_Print(response); /* Pretty-printed for readability */
+    cJSON_Delete(response);
+
+    http_response_add_header(resp, "Content-Disposition",
+                             "attachment; filename=\"my-data-export.json\"");
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+
+    LOG_INFO("GDPR data export for user: %s", user_id);
 }

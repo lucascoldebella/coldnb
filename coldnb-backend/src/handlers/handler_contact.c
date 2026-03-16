@@ -1,4 +1,5 @@
 #include "handlers/handler_contact.h"
+#include "auth/auth_middleware.h"
 #include "db/db_query.h"
 #include "services/svc_email.h"
 #include "util/json_util.h"
@@ -177,4 +178,104 @@ void handler_contact_submit(HttpRequest *req, HttpResponse *resp, void *user_dat
     free(message_copy);
     free(safe_name);
     free(safe_email);
+}
+
+void handler_admin_contact_register(HttpRouter *router, DbPool *pool) {
+    ROUTE_GET(router, "/api/admin/contacts", handler_admin_contact_list, pool);
+    ROUTE_PUT(router, "/api/admin/contacts/:id/read", handler_admin_contact_mark_read, pool);
+}
+
+void handler_admin_contact_list(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    const char *is_read_filter = http_request_get_query_param(req, "is_read");
+
+    const char *query;
+    if (is_read_filter && strcmp(is_read_filter, "true") == 0) {
+        query = "SELECT id, name, email, phone, subject, message, is_read, created_at "
+                "FROM contact_submissions WHERE is_read = true "
+                "ORDER BY created_at DESC";
+    } else if (is_read_filter && strcmp(is_read_filter, "false") == 0) {
+        query = "SELECT id, name, email, phone, subject, message, is_read, created_at "
+                "FROM contact_submissions WHERE is_read = false "
+                "ORDER BY created_at DESC";
+    } else {
+        query = "SELECT id, name, email, phone, subject, message, is_read, created_at "
+                "FROM contact_submissions "
+                "ORDER BY created_at DESC";
+    }
+
+    PGresult *result = db_exec_params(conn, query, 0, NULL);
+
+    if (!db_result_ok(result)) {
+        PQclear(result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Query failed");
+        return;
+    }
+
+    cJSON *submissions = db_result_to_json(result);
+    int total = PQntuples(result);
+    PQclear(result);
+    db_pool_release(pool, conn);
+
+    cJSON *data = cJSON_CreateObject();
+    cJSON_AddItemToObject(data, "submissions", submissions);
+    cJSON_AddNumberToObject(data, "total", total);
+
+    cJSON *response = json_create_success(data);
+    char *json = cJSON_PrintUnformatted(response);
+    cJSON_Delete(response);
+
+    http_response_json(resp, HTTP_STATUS_OK, json);
+    free(json);
+}
+
+void handler_admin_contact_mark_read(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+
+    if (!auth_is_admin(req)) {
+        http_response_error(resp, HTTP_STATUS_FORBIDDEN, "Admin access required");
+        return;
+    }
+
+    const char *id = http_request_get_path_param(req, "id");
+    if (str_is_empty(id)) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Submission ID required");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    const char *update_query =
+        "UPDATE contact_submissions SET is_read = true WHERE id = $1";
+    const char *update_params[] = { id };
+    PGresult *update_result = db_exec_params(conn, update_query, 1, update_params);
+
+    if (!db_result_ok(update_result)) {
+        PQclear(update_result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to update");
+        return;
+    }
+
+    PQclear(update_result);
+    db_pool_release(pool, conn);
+
+    http_response_json(resp, HTTP_STATUS_OK, "{\"success\":true,\"message\":\"Marked as read\"}");
 }

@@ -156,6 +156,13 @@ export default function ProductCard1({
             <span className="on-sale-item">-{product.salePercentage}</span>
           </div>
         )}
+        {product.inStock === false && (
+          <div className="on-sale-wrap">
+            <span className="on-sale-item" style={{ background: "#6b7280" }}>
+              {t("product.soldOut")}
+            </span>
+          </div>
+        )}
         {product.sizes && (
           <div className="variant-wrap size-list">
             <ul className="variant-box">
@@ -226,7 +233,14 @@ export default function ProductCard1({
           </a>
         </div>
         <div className="list-btn-main">
-          {product.addToCart == "Quick Add" ? (
+          {product.inStock === false ? (
+            <span
+              className="btn-main-product"
+              style={{ opacity: 0.5, pointerEvents: "none" }}
+            >
+              {t("product.soldOut")}
+            </span>
+          ) : product.addToCart == "Quick Add" ? (
             <a
               className="btn-main-product"
               href="#quickAdd"

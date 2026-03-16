@@ -5,6 +5,18 @@ import Products1 from "@/components/products/Products1";
 import Link from "next/link";
 import React from "react";
 
+export const metadata = {
+  title: "Shop Jewelry - Coldnb",
+  description: "Browse our collection of handcrafted jewelry. Rings, necklaces, earrings and bracelets made with premium materials.",
+  openGraph: {
+    title: "Shop Jewelry - Coldnb",
+    description: "Browse our collection of handcrafted jewelry. Rings, necklaces, earrings and bracelets made with premium materials.",
+    siteName: "Coldnb",
+    type: "website",
+    locale: "pt_BR",
+  },
+};
+
 export default function ShopDefaultGridPage() {
   return (
     <>

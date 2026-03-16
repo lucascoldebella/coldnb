@@ -117,6 +117,65 @@ export default function AccountSidebar() {
             </Link>
           </li>
           <li>
+            <Link
+              href={`/my-account-loyalty`}
+              className={`my-account-nav-item ${
+                pathname == "/my-account-loyalty" ? "active" : ""
+              } `}
+            >
+              <svg
+                width={24}
+                height={24}
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <polygon
+                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+                  stroke="#181818"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+              {t("loyalty.title")}
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={`/my-account-returns`}
+              className={`my-account-nav-item ${
+                pathname == "/my-account-returns" ? "active" : ""
+              } `}
+            >
+              <svg
+                width={24}
+                height={24}
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <polyline
+                  points="1 4 1 10 7 10"
+                  stroke="#181818"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M3.51 15a9 9 0 1 0 .49-3.75"
+                  stroke="#181818"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+              {t("returns.title")}
+            </Link>
+          </li>
+          <li>
             <button
               onClick={signOut}
               className={`my-account-nav-item`}

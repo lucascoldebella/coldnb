@@ -18,7 +18,7 @@ const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
   : null;
 
-function PaymentForm({ orderId, orderNumber, onSuccess, onError }) {
+function PaymentForm({ orderId, orderNumber, isGuest, guestEmail }) {
   const { t } = useLanguage();
   const stripe = useStripe();
   const elements = useElements();
@@ -35,7 +35,9 @@ function PaymentForm({ orderId, orderNumber, onSuccess, onError }) {
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/my-account-orders-details?order=${orderId}`,
+        return_url: isGuest
+          ? `${window.location.origin}/order-tracking?order=${orderNumber}&email=${encodeURIComponent(guestEmail || "")}`
+          : `${window.location.origin}/my-account-orders-details?order=${orderId}`,
       },
     });
 
@@ -68,7 +70,7 @@ export default function Checkout() {
   const { t } = useLanguage();
   const router = useRouter();
   const { isAuthenticated, isLoading: authLoading, session } = useUserAuth();
-  const { cartProducts, totalPrice, setCartProducts } = useContextElement();
+  const { cartProducts, totalPrice, clearCart } = useContextElement();
 
   const [step, setStep] = useState("shipping"); // "shipping" | "payment"
   const [loading, setLoading] = useState(false);
@@ -99,16 +101,18 @@ export default function Checkout() {
 
   // Discount
   const [discountCode, setDiscountCode] = useState("");
+  const [discountApplied, setDiscountApplied] = useState(null); // { type, value, amount, message }
+  const [discountLoading, setDiscountLoading] = useState(false);
+  const [discountError, setDiscountError] = useState("");
 
-  const shippingPrice = shippingResult ? parseFloat(shippingResult.price) : 0;
-  const grandTotal = totalPrice + shippingPrice;
+  const FREE_SHIPPING_THRESHOLD = 75;
+  const freeShipping = totalPrice >= FREE_SHIPPING_THRESHOLD;
+  const shippingPrice = (shippingResult && !freeShipping) ? parseFloat(shippingResult.price) : 0;
+  const discountAmount = discountApplied ? discountApplied.amount : 0;
+  const grandTotal = totalPrice - discountAmount + shippingPrice;
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/login?redirect=/checkout");
-    }
-  }, [authLoading, isAuthenticated, router]);
+  // Guest mode: true when user explicitly continues as guest
+  const [guestMode, setGuestMode] = useState(false);
 
   const formatCep = (value) => {
     const digits = value.replace(/\D/g, "").slice(0, 8);
@@ -144,6 +148,53 @@ export default function Checkout() {
     }
   };
 
+  const handleApplyDiscount = async () => {
+    if (!discountCode.trim()) return;
+    setDiscountLoading(true);
+    setDiscountError("");
+    setDiscountApplied(null);
+
+    try {
+      const { buildApiUrl } = await import("@/lib/apiBase");
+      const res = await fetch(
+        buildApiUrl(`/api/discount-codes/check?code=${encodeURIComponent(discountCode.trim())}`)
+      );
+      const json = await res.json();
+      const data = json.data || json;
+
+      if (!data.valid) {
+        setDiscountError(data.message || t("checkout.invalidDiscount"));
+        return;
+      }
+
+      let amount = 0;
+      if (data.discount_type === "percentage") {
+        amount = totalPrice * (data.discount_value / 100);
+      } else {
+        amount = data.discount_value;
+      }
+      if (data.maximum_discount > 0 && amount > data.maximum_discount) {
+        amount = data.maximum_discount;
+      }
+
+      if (totalPrice < (data.minimum_order || 0)) {
+        setDiscountError(
+          t("checkout.discountMinOrder").replace(
+            "{min}",
+            `R$ ${parseFloat(data.minimum_order).toFixed(2)}`
+          )
+        );
+        return;
+      }
+
+      setDiscountApplied({ ...data, amount });
+    } catch {
+      setDiscountError(t("checkout.discountError"));
+    } finally {
+      setDiscountLoading(false);
+    }
+  };
+
   const handleContinueToPayment = async () => {
     setError("");
 
@@ -158,76 +209,119 @@ export default function Checkout() {
       return;
     }
 
-    if (!stripePromise) {
-      setError(t("checkout.paymentNotConfigured"));
-      return;
-    }
-
     setLoading(true);
 
     try {
-      // 1. Save address
-      const addressRes = await addressesApi.create({
-        recipient_name: `${firstName} ${lastName}`,
-        phone,
-        street_address: street,
-        street_address_2: complement || null,
-        city,
-        state,
-        postal_code: cep.replace(/\D/g, ""),
-        country: "BR",
-      });
-      const addressId = addressRes.data?.data?.id || addressRes.data?.id;
+      let newOrderId, newOrderNumber;
 
-      if (!addressId) {
-        throw new Error("Failed to save address");
+      if (isAuthenticated) {
+        // --- Authenticated flow ---
+        // 1. Save address
+        const addressRes = await addressesApi.create({
+          recipient_name: `${firstName} ${lastName}`,
+          phone,
+          street_address: street,
+          street_address_2: complement || null,
+          city,
+          state,
+          postal_code: cep.replace(/\D/g, ""),
+          country: "BR",
+        });
+        const addressId = addressRes.data?.data?.id || addressRes.data?.id;
+        if (!addressId) throw new Error("Failed to save address");
+
+        // 2. Sync cart
+        if (cartProducts.length > 0) {
+          await Promise.all(
+            cartProducts.map((item) =>
+              cartApi.add(item.id, item.quantity || 1).catch(() => null)
+            )
+          );
+        }
+
+        // 3. Create order
+        const orderRes = await userApi.post("/api/orders", {
+          shipping_address_id: addressId,
+          payment_method: "card",
+          discount_code: discountCode || null,
+          notes: notes || null,
+        });
+        const orderData = orderRes.data?.data || orderRes.data;
+        newOrderId = orderData.id;
+        newOrderNumber = orderData.order_number;
+
+      } else {
+        // --- Guest flow ---
+        const { buildApiUrl } = await import("@/lib/apiBase");
+        const guestRes = await fetch(buildApiUrl("/api/guest-orders"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            guest_email: email,
+            guest_name: `${firstName} ${lastName}`,
+            phone,
+            shipping_street: street,
+            shipping_street_2: complement || null,
+            shipping_city: city,
+            shipping_state: state,
+            shipping_postal_code: cep.replace(/\D/g, ""),
+            shipping_country: "BR",
+            notes: notes || null,
+            discount_code: discountCode || null,
+            items: cartProducts.map((item) => ({
+              product_id: item.id,
+              quantity: item.quantity || 1,
+            })),
+          }),
+        });
+        const guestJson = await guestRes.json();
+        if (!guestRes.ok) {
+          throw new Error(guestJson.error || t("checkout.orderFailed"));
+        }
+        const orderData = guestJson.data || guestJson;
+        newOrderId = orderData.id;
+        newOrderNumber = orderData.order_number;
       }
 
-      // 2. Sync cart to server before order creation
-      if (cartProducts.length > 0) {
-        await Promise.all(
-          cartProducts.map((item) =>
-            cartApi.add(item.id, item.quantity || 1).catch(() => null)
-          )
-        );
-      }
-
-      // 3. Create order
-      const orderRes = await userApi.post("/api/orders", {
-        shipping_address_id: addressId,
-        payment_method: "card",
-        discount_code: discountCode || null,
-        notes: notes || null,
-      });
-
-      const orderData = orderRes.data?.data || orderRes.data;
-      const newOrderId = orderData.id;
-      const newOrderNumber = orderData.order_number;
-
-      if (!newOrderId) {
-        throw new Error("Failed to create order");
-      }
+      if (!newOrderId) throw new Error("Failed to create order");
 
       setOrderId(newOrderId);
       setOrderNumber(newOrderNumber);
-
-      // Clear frontend cart (backend already cleared server cart)
-      setCartProducts([]);
+      clearCart();
 
       // 4. Create payment intent
-      const paymentRes = await userApi.post("/api/payments/create-intent", {
-        order_id: newOrderId,
-      });
-
-      const paymentData = paymentRes.data?.data || paymentRes.data;
-      const secret = paymentData.client_secret;
-
-      if (!secret) {
-        throw new Error("Failed to create payment");
+      if (stripePromise) {
+        let paymentData;
+        if (isAuthenticated) {
+          const paymentRes = await userApi.post("/api/payments/create-intent", {
+            order_id: newOrderId,
+          });
+          paymentData = paymentRes.data?.data || paymentRes.data;
+        } else {
+          // Guest payment intent — verified via email
+          const { buildApiUrl } = await import("@/lib/apiBase");
+          const paymentRes = await fetch(buildApiUrl("/api/guest-payments/create-intent"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              order_id: newOrderId,
+              guest_email: email,
+            }),
+          });
+          const paymentJson = await paymentRes.json();
+          if (!paymentRes.ok) {
+            throw new Error(paymentJson.error || t("checkout.paymentFailed"));
+          }
+          paymentData = paymentJson.data || paymentJson;
+        }
+        const secret = paymentData.client_secret;
+        if (!secret) throw new Error("Failed to create payment");
+        setClientSecret(secret);
+        setStep("payment");
+      } else {
+        // Stripe not configured — show order confirmation
+        setStep("confirmation");
       }
-
-      setClientSecret(secret);
-      setStep("payment");
     } catch (err) {
       const msg =
         err.response?.data?.error ||
@@ -251,8 +345,62 @@ export default function Checkout() {
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
+  // Guest choice screen: shown to unauthenticated users who haven't chosen guest mode yet
+  if (!isAuthenticated && !guestMode) {
+    return (
+      <section className="flat-spacing">
+        <div className="container">
+          <div className="row justify-content-center">
+            <div className="col-lg-6">
+              <div className="tf-page-checkout" style={{ padding: "40px 0" }}>
+                <h5 className="title mb_20">{t("checkout.howToContinue")}</h5>
+                <div className="d-flex flex-column gap-12">
+                  <Link
+                    href={`/login?redirect=/checkout`}
+                    className="tf-btn btn-fill w-100 justify-content-center"
+                  >
+                    <span className="text text-button">{t("checkout.loginToContinue")}</span>
+                  </Link>
+                  <button
+                    className="tf-btn btn-outline w-100 justify-content-center"
+                    onClick={() => setGuestMode(true)}
+                  >
+                    <span className="text text-button">{t("checkout.continueAsGuest")}</span>
+                  </button>
+                </div>
+                <p className="text-secondary text-center mt_20" style={{ fontSize: 13 }}>
+                  {t("checkout.guestNote")}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (step === "confirmation") {
+    return (
+      <section className="flat-spacing">
+        <div className="container">
+          <div className="row justify-content-center">
+            <div className="col-lg-6 text-center" style={{ padding: "40px 0" }}>
+              <i className="icon-check" style={{ fontSize: 48, color: "#28a745" }} />
+              <h4 className="mt_16 mb_8">{t("checkout.orderConfirmed")}</h4>
+              <p className="text-secondary mb_20">
+                {t("checkout.orderCreated")} <strong>{orderNumber}</strong>
+              </p>
+              <p className="text-secondary mb_20" style={{ fontSize: 13 }}>
+                {t("checkout.guestOrderNote").replace("{email}", email)}
+              </p>
+              <Link href="/" className="tf-btn btn-fill">
+                <span className="text text-button">{t("checkout.continueShopping")}</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   if (step === "payment" && clientSecret && stripePromise) {
@@ -277,6 +425,8 @@ export default function Checkout() {
                     <PaymentForm
                       orderId={orderId}
                       orderNumber={orderNumber}
+                      isGuest={guestMode}
+                      guestEmail={email}
                     />
                   </Elements>
                 </div>
@@ -314,11 +464,11 @@ export default function Checkout() {
         <div className="row">
           <div className="col-xl-6">
             <div className="flat-spacing tf-page-checkout">
-              {!isAuthenticated && (
+              {guestMode && (
                 <div className="wrap">
                   <div className="title-login">
                     <p>{t("checkout.alreadyHaveAccount")}</p>{" "}
-                    <Link href="/login" className="text-button">
+                    <Link href="/login?redirect=/checkout" className="text-button">
                       {t("checkout.loginHere")}
                     </Link>
                   </div>
@@ -447,9 +597,37 @@ export default function Checkout() {
                     type="text"
                     placeholder={t("checkout.addVoucherDiscount")}
                     value={discountCode}
-                    onChange={(e) => setDiscountCode(e.target.value)}
+                    onChange={(e) => {
+                      setDiscountCode(e.target.value);
+                      setDiscountApplied(null);
+                      setDiscountError("");
+                    }}
+                    disabled={!!discountApplied}
                   />
+                  <button
+                    type="button"
+                    className="tf-btn btn-fill"
+                    style={{ whiteSpace: "nowrap", marginLeft: 8 }}
+                    onClick={discountApplied ? () => { setDiscountApplied(null); setDiscountCode(""); } : handleApplyDiscount}
+                    disabled={discountLoading || (!discountApplied && !discountCode.trim())}
+                  >
+                    <span className="text text-button" style={{ fontSize: 13 }}>
+                      {discountLoading
+                        ? t("common.loading")
+                        : discountApplied
+                        ? t("checkout.removeDiscount")
+                        : t("checkout.applyCode")}
+                    </span>
+                  </button>
                 </div>
+                {discountError && (
+                  <p style={{ color: "#dc3545", fontSize: 13, marginBottom: 8 }}>{discountError}</p>
+                )}
+                {discountApplied && (
+                  <p style={{ color: "#28a745", fontSize: 13, marginBottom: 8 }}>
+                    {t("checkout.discountApplied").replace("{amount}", `R$ ${discountApplied.amount.toFixed(2)}`)}
+                  </p>
+                )}
 
                 {error && (
                   <p style={{ color: "#dc3545", marginBottom: 12 }}>{error}</p>
@@ -524,10 +702,18 @@ export default function Checkout() {
                       <span>{t("checkout.subtotal")}</span>
                       <span>R$ {totalPrice.toFixed(2)}</span>
                     </div>
+                    {discountApplied && (
+                      <div className="item d-flex align-items-center justify-content-between text-button" style={{ color: "#28a745" }}>
+                        <span>{t("checkout.discount")} ({discountCode})</span>
+                        <span>-R$ {discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="item d-flex align-items-center justify-content-between text-button">
                       <span>{t("checkout.shipping")}</span>
-                      <span>
-                        {shippingResult
+                      <span style={freeShipping ? { color: "#28a745" } : undefined}>
+                        {freeShipping
+                          ? t("cart.freeShippingCongrats")
+                          : shippingResult
                           ? `R$ ${shippingPrice.toFixed(2)}`
                           : t("checkout.enterCep")}
                       </span>

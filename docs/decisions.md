@@ -140,3 +140,155 @@
 - Public tracking URL is `/api/track-order` (not under `/api/orders/`)
 - Any future public order-related endpoints must also avoid the `/api/orders` prefix
 - Frontend `OrderTrac.jsx` calls `/api/track-order` directly
+
+---
+
+## ADR-010: Guest Orders at `/api/guest-orders` (separate from `/api/orders`)
+
+**Decision:** Guest checkout uses `POST /api/guest-orders` rather than extending `POST /api/orders` to support unauthenticated access.
+
+**Context:** `/api/orders` is protected by path-prefix auth middleware. Enabling guest access would require middleware restructuring or special-casing. Guest orders also have a fundamentally different input shape (items array in body vs. reading from server-side cart).
+
+**Rationale:**
+- Same path-prefix middleware constraint as ADR-009 — easier to use a different prefix
+- Guest orders need items inline in the request body (no server-side cart for unauthenticated users)
+- Keeping them separate keeps the authenticated order handler clean and avoids conditional logic in a critical path
+- Guest orders are identified by `guest_email` on the `orders` table (`user_id = NULL`)
+
+**Consequences:**
+- `guest_email` and `guest_name` columns added to orders table (migration 007)
+- Admin can see guest orders in the orders list — they show no user profile link
+- Guest order tracking still works via `GET /api/track-order` (order_number + email)
+- Guest Stripe payment not yet implemented — guest orders show confirmation screen (COD/deferred payment)
+
+---
+
+## ADR-011: Returns Only for Delivered Orders
+
+**Decision:** Return requests (`POST /api/returns`) are only accepted when `orders.status = 'delivered'`.
+
+**Context:** Returns must be filed after the customer has received the item. Allowing returns on in-transit orders would create operational confusion.
+
+**Rationale:**
+- Clear business rule: you cannot return what you haven't received
+- Simplifies admin workflow — returns only appear after delivery is confirmed
+- One active return per order enforced at the database level to prevent duplicate requests
+
+**Consequences:**
+- "Request Return" button in `OrderDetails.jsx` is hidden unless `order.status === 'delivered'`
+- Admin must mark order as "delivered" before customer can request a return
+- Return statuses: `requested → under_review → approved/rejected → refunded`
+
+---
+
+## ADR-012: HMAC-Based Email Unsubscribe Tokens
+
+**Decision:** Unsubscribe links use HMAC-SHA256 signed tokens derived from the email address, with no DB-stored tokens.
+
+**Context:** Transactional emails need one-click unsubscribe links per LGPD and email best practices. Options: random tokens stored in DB, or deterministic HMAC tokens.
+
+**Rationale:**
+- No additional DB table or token management needed
+- Tokens are deterministic: same email always produces the same token
+- HMAC key derived from `store_name + sender_email` — changes if email config changes (intentional invalidation)
+- Constant-time comparison prevents timing attacks
+
+**Consequences:**
+- Unsubscribe links never expire (acceptable for newsletter unsubscribe)
+- If email service config changes, all existing unsubscribe links stop working
+- Unsubscribe applies to the `newsletter_subscribers` table only
+
+---
+
+## ADR-013: Loyalty Redemptions Create Discount Codes
+
+**Decision:** When a customer redeems loyalty points for a reward, the system generates a single-use discount code in the existing `discount_codes` table.
+
+**Context:** Loyalty rewards could grant direct price reductions (complex checkout changes) or generate discount codes (reuses existing infrastructure).
+
+**Rationale:**
+- Reuses the proven discount code validation and checkout integration
+- Customer gets a tangible code they can apply at checkout like any other coupon
+- No checkout code changes needed — the loyalty reward becomes a standard discount
+- Single-use enforced via `usage_limit = 1`
+
+**Consequences:**
+- Codes prefixed `LOYALTY-XXXXXX` for easy identification
+- Reward redemption is recorded in `loyalty_redemptions` table for audit
+- Points deducted immediately at redemption (not at code use)
+
+---
+
+## ADR-014: Abandoned Cart Emails Are Admin-Triggered
+
+**Decision:** Abandoned cart recovery emails are sent via admin action (`POST /api/admin/abandoned-carts/send`), not an automatic cron job.
+
+**Context:** Automatic email sending requires a scheduler (cron) integrated with the C backend. Manual triggering via admin panel is simpler and gives the admin control.
+
+**Rationale:**
+- No cron infrastructure needed in the C backend
+- Admin has visibility into how many users are eligible before sending
+- 3-day cooldown per user prevents email fatigue
+- Can be automated later via external cron calling the endpoint
+
+**Consequences:**
+- Admin must periodically trigger sends (or set up external cron)
+- `abandoned_cart_emails` table tracks sent emails with cooldown enforcement
+- Eligible carts: idle >24h, no recent order, no email in last 3 days
+
+---
+
+## ADR-015: Invoice as Print-Optimized Page (No Server-Side PDF)
+
+**Decision:** Invoice generation uses a dedicated `/invoice/[id]` page with CSS @media print, rather than server-side PDF generation.
+
+**Context:** Options: add a PDF library (jsPDF, Puppeteer, WeasyPrint) or use browser print-to-PDF.
+
+**Rationale:**
+- Zero additional dependencies
+- Browser print-to-PDF produces high-quality output
+- Full React rendering with dynamic data
+- Works on all devices with a print function
+
+**Consequences:**
+- Requires user to click "Print / Save as PDF"
+- No programmatic PDF attachment in emails (would need a library for that)
+- Print stylesheet hides navigation and non-invoice elements
+
+---
+
+## ADR-016: Loyalty Points Auto-Award on Order Delivery
+
+**Decision:** Automatically award loyalty points (1 point per R$ 1 of order total) when an admin marks an order as `delivered`, within the same DB transaction.
+
+**Context:** Loyalty points were initially admin-granted only. Auto-awarding needs to happen at the right lifecycle point — not on order creation (payment may fail), not on shipped (customer hasn't received yet).
+
+**Rationale:**
+- `delivered` status confirms the customer received the product — fair point to award loyalty
+- Using `FLOOR(total_price)::int` gives clean integer points without fractional complexity
+- Idempotent via `NOT EXISTS` subquery — safe if admin changes status multiple times
+- Runs inside the existing order status update transaction — no partial state
+- Guest orders (`user_id IS NULL`) are automatically excluded
+
+**Consequences:**
+- Points appear in customer's `/my-account-loyalty` immediately after delivery
+- No separate cron or background job needed — inline with status update
+- Points cannot be retroactively awarded for orders delivered before this feature was added (admin can still grant manually)
+
+---
+
+## ADR-017: Customer Order Cancellation Restricted to Early Statuses
+
+**Decision:** Customers can cancel their own orders via `PUT /api/orders/:id/cancel`, but only when `status` is `pending` or `processing`.
+
+**Context:** Orders progress through: pending → confirmed → processing → shipped → delivered. Cancellation after shipment is operationally infeasible (requires return workflow instead).
+
+**Rationale:**
+- Once shipped, physical logistics are in motion — cancellation is not meaningful
+- `confirmed` is excluded because it implies the store has acknowledged the order
+- Backend enforces ownership check (`user_id` match) to prevent cross-user cancellations
+- Two-step confirmation in frontend prevents accidental cancellations
+
+**Consequences:**
+- Customers wanting to cancel after `processing` must use the return workflow (after delivery)
+- Admin can still cancel orders at any status via the admin panel

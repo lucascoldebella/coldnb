@@ -32,6 +32,7 @@ void handler_orders_register(HttpRouter *router, DbPool *pool) {
     ROUTE_POST(router, "/api/orders", handler_orders_create, pool);
     ROUTE_GET(router, "/api/orders", handler_orders_list, pool);
     ROUTE_GET(router, "/api/orders/:id", handler_orders_get, pool);
+    ROUTE_PUT(router, "/api/orders/:id/cancel", handler_orders_cancel, pool);
 }
 
 void handler_orders_track_register(HttpRouter *router, DbPool *pool) {
@@ -749,4 +750,143 @@ void handler_orders_track(HttpRequest *req, HttpResponse *resp, void *user_data)
 
     http_response_json(resp, HTTP_STATUS_OK, json);
     free(json);
+}
+
+void handler_orders_cancel(HttpRequest *req, HttpResponse *resp, void *user_data) {
+    DbPool *pool = (DbPool *)user_data;
+    const char *user_id = auth_get_user_id(req);
+
+    if (user_id == NULL) {
+        http_response_error(resp, HTTP_STATUS_UNAUTHORIZED, "Authentication required");
+        return;
+    }
+
+    const char *order_id = http_request_get_path_param(req, "id");
+    if (str_is_empty(order_id) || !uuid_validate(order_id)) {
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST, "Invalid order ID");
+        return;
+    }
+
+    PGconn *conn = db_pool_acquire(pool);
+    if (conn == NULL) {
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Database connection failed");
+        return;
+    }
+
+    /* Verify order belongs to user and is in a cancellable state */
+    const char *check_query =
+        "SELECT o.id, o.status, o.order_number, u.email, u.full_name "
+        "FROM orders o "
+        "JOIN users u ON o.user_id = u.id "
+        "WHERE o.id = $1 AND (u.id = $2 OR u.supabase_id = $2)";
+    const char *check_params[] = { order_id, user_id };
+    PGresult *check_result = db_exec_params(conn, check_query, 2, check_params);
+
+    if (!db_result_ok(check_result) || !db_result_has_rows(check_result)) {
+        PQclear(check_result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_NOT_FOUND, "Order not found");
+        return;
+    }
+
+    const char *current_status = PQgetvalue(check_result, 0, 1);
+    if (strcmp(current_status, "pending") != 0 && strcmp(current_status, "processing") != 0) {
+        PQclear(check_result);
+        db_pool_release(pool, conn);
+        http_response_error(resp, HTTP_STATUS_BAD_REQUEST,
+                           "Only pending or processing orders can be cancelled");
+        return;
+    }
+
+    /* Copy email info for notification after commit */
+    DbRow check_row = { .result = check_result, .row = 0 };
+    const char *on_val = db_row_get_string(&check_row, "order_number");
+    const char *em_val = db_row_get_string(&check_row, "email");
+    const char *nm_val = db_row_get_string(&check_row, "full_name");
+    char *cancel_order_num = on_val ? str_dup(on_val) : NULL;
+    char *cancel_email = em_val ? str_dup(em_val) : NULL;
+    char *cancel_name = nm_val ? str_dup(nm_val) : NULL;
+    PQclear(check_result);
+
+    /* Begin transaction for atomic cancel + stock restore */
+    if (!db_begin(conn)) {
+        db_pool_release(pool, conn);
+        free(cancel_order_num); free(cancel_email); free(cancel_name);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Transaction failed");
+        return;
+    }
+
+    /* Restore stock for each order item */
+    const char *items_query =
+        "SELECT product_id, quantity FROM order_items WHERE order_id = $1";
+    const char *items_params[] = { order_id };
+    PGresult *items_result = db_exec_params(conn, items_query, 1, items_params);
+
+    if (db_result_ok(items_result)) {
+        int count = PQntuples(items_result);
+        for (int i = 0; i < count; i++) {
+            const char *pid = PQgetvalue(items_result, i, 0);
+            const char *qty = PQgetvalue(items_result, i, 1);
+            const char *stock_query =
+                "UPDATE products SET stock_quantity = stock_quantity + $1 WHERE id = $2";
+            const char *stock_params[] = { qty, pid };
+            PGresult *stock_result = db_exec_params(conn, stock_query, 2, stock_params);
+            PQclear(stock_result);
+        }
+    }
+    PQclear(items_result);
+
+    /* Update order status to cancelled */
+    const char *update_query =
+        "UPDATE orders SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW() "
+        "WHERE id = $1";
+    const char *update_params[] = { order_id };
+    PGresult *update_result = db_exec_params(conn, update_query, 1, update_params);
+
+    if (!db_result_ok(update_result)) {
+        PQclear(update_result);
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        free(cancel_order_num); free(cancel_email); free(cancel_name);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to cancel order");
+        return;
+    }
+    PQclear(update_result);
+
+    /* Insert order history entry */
+    const char *history_query =
+        "INSERT INTO order_history (order_id, status, note) "
+        "VALUES ($1, 'cancelled', 'Cancelled by customer')";
+    const char *history_params[] = { order_id };
+    PGresult *history_result = db_exec_params(conn, history_query, 1, history_params);
+    PQclear(history_result);
+
+    if (!db_commit(conn)) {
+        db_rollback(conn);
+        db_pool_release(pool, conn);
+        free(cancel_order_num); free(cancel_email); free(cancel_name);
+        http_response_error(resp, HTTP_STATUS_INTERNAL_ERROR, "Failed to commit cancellation");
+        return;
+    }
+
+    db_pool_release(pool, conn);
+
+    LOG_INFO("Order %s cancelled by customer, stock restored", order_id);
+    http_response_json(resp, HTTP_STATUS_OK, "{\"success\":true,\"message\":\"Order cancelled\"}");
+
+    /* Send cancellation confirmation email (after response, best-effort) */
+    if (cancel_email != NULL && cancel_order_num != NULL) {
+        EmailOrderStatusUpdate cancel_update = {
+            .order_number = cancel_order_num,
+            .customer_email = cancel_email,
+            .customer_name = cancel_name,
+            .status = "cancelled"
+        };
+        if (email_service_send_order_status_update(&cancel_update) != 0) {
+            LOG_WARN("Cancellation email failed for order %s", cancel_order_num);
+        }
+    }
+    free(cancel_order_num);
+    free(cancel_email);
+    free(cancel_name);
 }

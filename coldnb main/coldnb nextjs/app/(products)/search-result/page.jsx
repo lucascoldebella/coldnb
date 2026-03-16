@@ -2,7 +2,12 @@ import Footer1 from "@/components/footers/Footer1";
 import Header1 from "@/components/headers/Header1";
 import Topbar6 from "@/components/headers/Topbar6";
 import SearchProducts from "@/components/products/SearchProducts";
-import React from "react";
+import React, { Suspense } from "react";
+
+export const metadata = {
+  title: "Search Products - Coldnb",
+  description: "Search our jewelry collection. Find rings, necklaces, earrings and more.",
+};
 
 export default function SearchResultPage() {
   return (
@@ -21,7 +26,9 @@ export default function SearchResultPage() {
           </div>
         </div>
       </div>
-      <SearchProducts />
+      <Suspense fallback={<div className="flat-spacing text-center"><div className="spinner-border" /></div>}>
+        <SearchProducts />
+      </Suspense>
 
       <Footer1 />
     </>

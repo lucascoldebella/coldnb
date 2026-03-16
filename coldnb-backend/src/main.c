@@ -32,6 +32,12 @@
 #include "handlers/handler_admin_homepage.h"
 #include "handlers/handler_admin_navigation.h"
 #include "handlers/handler_shipping.h"
+#include "handlers/handler_discounts.h"
+#include "handlers/handler_abandoned_cart.h"
+#include "handlers/handler_loyalty.h"
+#include "handlers/handler_guest_orders.h"
+#include "handlers/handler_returns.h"
+#include "handlers/handler_admin_exports.h"
 #include "util/hash_util.h"
 #include "log/log.h"
 
@@ -308,8 +314,11 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     handler_newsletter_register(router, pool);
     handler_contact_register(router, pool);
     handler_orders_track_register(router, pool);
+    handler_discounts_register(router, pool);
+    handler_guest_orders_register(router, pool);
 
     /* Apply auth middleware to protected paths */
+    http_router_use_path(router, "/api/returns", auth_middleware_required, NULL);
     http_router_use_path(router, "/api/cart", auth_middleware_required, NULL);
     http_router_use_path(router, "/api/user", auth_middleware_required, NULL);
     http_router_use_path(router, "/api/addresses", auth_middleware_required, NULL);
@@ -328,6 +337,12 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     http_router_use_path(router, "/api/admin/navigation", auth_middleware_admin, NULL);
     http_router_use_path(router, "/api/admin/shipping", auth_middleware_admin, NULL);
     http_router_use_path(router, "/api/admin/categories", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/returns", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/discounts", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/abandoned-carts", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/exports", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/admin/loyalty", auth_middleware_admin, NULL);
+    http_router_use_path(router, "/api/loyalty", auth_middleware_required, NULL);
 
     /* Protected routes (auth required) */
     handler_cart_register(router, pool);
@@ -346,6 +361,13 @@ static void register_routes(HttpRouter *router, DbPool *pool) {
     handler_admin_homepage_register(router, pool);
     handler_admin_navigation_register(router, pool);
     handler_shipping_register(router, pool);
+    handler_returns_register(router, pool);
+    handler_admin_returns_register(router, pool);
+    handler_abandoned_cart_register(router, pool);
+    handler_loyalty_register(router, pool);
+    handler_admin_newsletter_register(router, pool);
+    handler_admin_contact_register(router, pool);
+    handler_admin_exports_register(router, pool);
 
     LOG_INFO("Routes registered");
 }

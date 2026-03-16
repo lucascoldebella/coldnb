@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 import { useUserAuth } from "@/context/UserAuthContext";
-import { addressesApi, ordersApi } from "@/lib/userApi";
+import { addressesApi, ordersApi, profileApi } from "@/lib/userApi";
 import toast from "react-hot-toast";
 
 function getProviderLabel(provider) {
@@ -26,6 +26,8 @@ export default function ClientPanel() {
   const [orderCount, setOrderCount] = useState(0);
   const [defaultAddress, setDefaultAddress] = useState(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -113,6 +115,24 @@ export default function ClientPanel() {
     }
   };
 
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const response = await profileApi.exportData();
+      const blob = new Blob([response.data], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `my-data-${new Date().toISOString().split("T")[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success(t("account.exportSuccess"));
+    } catch {
+      toast.error(t("account.exportError"));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="mb_32">
       <div
@@ -185,19 +205,59 @@ export default function ClientPanel() {
               </Link>
               <button
                 type="button"
-                className="tf-btn radius-4"
-                onClick={handleDeleteAccount}
-                disabled={isDeletingAccount}
-                style={{
-                  background: "#c62828",
-                  borderColor: "#c62828",
-                  color: "#fff",
-                }}
+                className="tf-btn btn-outline radius-4"
+                onClick={handleExportData}
+                disabled={isExporting}
               >
                 <span className="text">
-                  {isDeletingAccount ? "..." : t("auth.deleteAccount")}
+                  {isExporting ? "..." : t("account.exportMyData")}
                 </span>
               </button>
+              {!showDeleteConfirm ? (
+                <button
+                  type="button"
+                  className="tf-btn radius-4"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={{
+                    background: "#c62828",
+                    borderColor: "#c62828",
+                    color: "#fff",
+                  }}
+                >
+                  <span className="text">{t("auth.deleteAccount")}</span>
+                </button>
+              ) : (
+                <div className="d-flex flex-column gap-8 align-items-stretch align-items-lg-end">
+                  <p style={{ color: "#c62828", fontSize: 13, margin: 0 }}>
+                    {t("auth.deleteAccountConfirm")}
+                  </p>
+                  <div className="d-flex gap-8">
+                    <button
+                      type="button"
+                      className="tf-btn radius-4"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      style={{ background: "#666", borderColor: "#666", color: "#fff" }}
+                    >
+                      <span className="text">{t("common.cancel")}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="tf-btn radius-4"
+                      onClick={handleDeleteAccount}
+                      disabled={isDeletingAccount}
+                      style={{
+                        background: "#c62828",
+                        borderColor: "#c62828",
+                        color: "#fff",
+                      }}
+                    >
+                      <span className="text">
+                        {isDeletingAccount ? "..." : t("auth.confirmDelete")}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

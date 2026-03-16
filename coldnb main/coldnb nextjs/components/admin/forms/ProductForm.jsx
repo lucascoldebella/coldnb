@@ -45,6 +45,8 @@ export default function ProductForm({
     weight: initialData.weight || "",
     is_active: initialData.is_active !== undefined ? Boolean(initialData.is_active) : true,
     is_featured: Boolean(initialData.is_featured),
+    is_new: Boolean(initialData.is_new),
+    is_sale: Boolean(initialData.is_sale),
     meta_title: initialData.meta_title || "",
     meta_description: initialData.meta_description || "",
   });
@@ -74,6 +76,8 @@ export default function ProductForm({
         weight: initialData.weight || "",
         is_active: initialData.is_active !== undefined ? Boolean(initialData.is_active) : true,
         is_featured: Boolean(initialData.is_featured),
+        is_new: Boolean(initialData.is_new),
+        is_sale: Boolean(initialData.is_sale),
         meta_title: initialData.meta_title || "",
         meta_description: initialData.meta_description || "",
       });
@@ -233,6 +237,8 @@ export default function ProductForm({
       low_stock_threshold: parseInt(formData.low_stock_threshold, 10) || 10,
       is_active: Boolean(formData.is_active),
       is_featured: Boolean(formData.is_featured),
+      is_new: Boolean(formData.is_new),
+      is_sale: Boolean(formData.is_sale),
       meta_title: formData.meta_title || null,
       meta_description: formData.meta_description || null,
       images,
@@ -593,6 +599,20 @@ export default function ProductForm({
                 onClick={() => setFormData(prev => ({ ...prev, is_featured: !prev.is_featured }))}
               />
               <span className="toggle-label">Featured</span>
+            </label>
+            <label className="admin-toggle">
+              <span
+                className={`toggle-switch ${formData.is_new ? "active" : ""}`}
+                onClick={() => setFormData(prev => ({ ...prev, is_new: !prev.is_new }))}
+              />
+              <span className="toggle-label">New Arrival</span>
+            </label>
+            <label className="admin-toggle">
+              <span
+                className={`toggle-switch ${formData.is_sale ? "active" : ""}`}
+                onClick={() => setFormData(prev => ({ ...prev, is_sale: !prev.is_sale }))}
+              />
+              <span className="toggle-label">On Sale</span>
             </label>
           </div>
         </div>

@@ -7,7 +7,7 @@ applies_to: ["coldnb-backend/sql/**", "**/*.sql"]
 ## Migration File Conventions
 - Files live in `coldnb-backend/sql/`
 - Naming: `00N_description.sql` (sequential, 3-digit zero-padded)
-- Apply in order: 001 → 002 → 003 → 004 → 005 → 006
+- Apply in order: 001 → 002 → 003 → 004 → 005 → 006 → 007 → 008
 - **NEVER** modify an already-applied migration — create a new one instead
 
 ## Current Migrations (Applied Order)
@@ -17,6 +17,8 @@ applies_to: ["coldnb-backend/sql/**", "**/*.sql"]
 4. `004_shipping_zones.sql` — Shipping zones, methods, and rules
 5. `005_navigation_menus.sql` — Dynamic navigation menu tables
 6. `006_order_tracking.sql` — Added `tracking_number`, `carrier`, `estimated_delivery_date` columns to orders table + tracking index
+7. `007_guest_checkout_and_returns.sql` — Added `guest_email`, `guest_name` to orders table (for guest checkout); created `order_returns` table with `reason`, `description`, `status`, `admin_notes`, `refund_amount`, `resolved_at`
+8. `008_abandoned_cart_and_loyalty.sql` — Created `abandoned_cart_emails` (recovery email tracking), `loyalty_points` (points ledger with reason/reference), `loyalty_rewards` (rewards catalog with points_cost/type/value), `loyalty_redemptions` (tracks redemptions with discount codes)
 
 ## Rules
 - **NEVER run migrations without explicit human confirmation**
@@ -51,3 +53,6 @@ psql -U coldnb -d coldnb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; G
 - `users.supabase_id`: synced from Supabase auth, used for user lookup from JWT claims
 - `admin_users`: completely separate table, no relation to `users` table
 - `discount_codes.usage_limit NULL` means unlimited usage
+- `loyalty_redemptions` generates discount codes in `discount_codes` table (prefixed `LOYALTY-XXXXXX`, `usage_limit=1`)
+- `loyalty_points.points` can be positive (earned/granted) or negative (spent on redemption)
+- `abandoned_cart_emails` enforces 3-day cooldown per user via query filter

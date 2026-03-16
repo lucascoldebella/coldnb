@@ -28,7 +28,8 @@ Supabase ──▶ Brevo SMTP (auth emails: signup, reset, magic link)
 - **Port (dev):** 3000; **Port (prod):** 3000 via PM2 → Nginx proxy
 - **App Router** with route groups: `(homes)`, `(products)`, `(productDetails)`, `(my-account)`, `(admin)`, `(other-pages)`, `(blogs)`
 - **State:** React Context API (CustomerContext, AdminContext, UserAuthContext, LanguageContext, ThemeContext)
-- **API calls:** Via Axios — `lib/adminApi.js` for admin (JWT interceptor), `@supabase/supabase-js` for auth
+- **API calls:** Via Axios — `lib/adminApi.js` for admin (JWT interceptor), `lib/userApi.js` for customers (Supabase JWT interceptor), `@supabase/supabase-js` for auth
+- **Admin pages:** Dashboard, financial, main page, products, categories, inventory, orders, returns, shipping, customers, discounts, marketing, newsletter subscribers, contact submissions, email, team
 
 ### Backend (C / libmicrohttpd)
 - **Location:** `coldnb-backend/`
@@ -82,6 +83,26 @@ Frontend: Cart → Checkout UI → Stripe PaymentElement (card or PIX)
   ├── Frontend: Stripe confirms payment via PaymentElement
   └── Stripe webhook → POST /api/webhooks/stripe → Update payment_status + order status
 Backend: Send order confirmation email (customer + internal)
+```
+
+### Order Cancellation Flow (Customer, Auth Required)
+```
+Customer: /my-account-orders-details → Cancel Order
+  ├── Frontend: PUT /api/orders/:id/cancel (Supabase JWT)
+  ├── Backend: Verify order ownership (user_id match)
+  ├── Backend: Verify status is "pending" or "processing"
+  ├── Backend: UPDATE status = 'cancelled', cancelled_at = NOW()
+  └── Backend: INSERT order_history entry
+```
+
+### Order Delivery → Loyalty Points Auto-Award
+```
+Admin: /admin/orders/[id] → Update Status to "delivered"
+  ├── Backend: UPDATE status = 'delivered', delivered_at = NOW()
+  ├── Backend: INSERT INTO loyalty_points (1 point per R$ 1 of total_price)
+  │   └── Idempotent: NOT EXISTS check prevents duplicate awards
+  ├── Backend: INSERT order_history entry
+  └── Backend: COMMIT transaction
 ```
 
 ### Order Tracking Flow (Public, No Auth)

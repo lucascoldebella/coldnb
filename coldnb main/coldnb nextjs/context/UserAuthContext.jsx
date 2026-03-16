@@ -69,9 +69,10 @@ export function UserAuthProvider({ children }) {
       const res = await cartApi.get();
       const serverItems = res.data?.data?.items || [];
 
-      // Transform server items to frontend shape
+      // Transform server items to frontend shape (cartItemId enables write-through sync)
       const merged = serverItems.map((item) => ({
         id: item.product_id,
+        cartItemId: item.id,
         title: item.product_name,
         price: parseFloat(item.price) || 0,
         imgSrc: item.image_url || "/images/products/placeholder.jpg",

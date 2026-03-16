@@ -1,33 +1,68 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Pagination } from "swiper/modules";
 import { Swiper, SwiperSlide } from "swiper/react";
 import ProductCard1 from "../productCards/ProductCard1";
 import Link from "next/link";
-import { getProducts } from "@/lib/shopApi";
+import { getProducts, searchProducts } from "@/lib/shopApi";
 import { useLanguage } from "@/lib/i18n/LanguageContext";
 
 export default function SearchProducts() {
   const { t } = useLanguage();
-  const [products, setProducts] = useState([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialQuery = searchParams.get("q") || "";
+  const [query, setQuery] = useState(initialQuery);
+  const [results, setResults] = useState([]);
+  const [recentProducts, setRecentProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     getProducts({ per_page: 4 })
-      .then((res) => setProducts(res.products || []))
+      .then((res) => setRecentProducts(res.products || []))
       .catch(() => {});
   }, []);
 
+  const doSearch = useCallback(async (q) => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setHasSearched(true);
+    try {
+      const products = await searchProducts(q.trim());
+      setResults(products);
+    } catch {
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Auto-search when URL param changes
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q) {
+      setQuery(q);
+      doSearch(q);
+    }
+  }, [searchParams, doSearch]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    router.push(`/search-result?q=${encodeURIComponent(query.trim())}`);
+  };
+
   return (
     <>
-      {/* search */}
+      {/* Search bar */}
       <section className="flat-spacing page-search-inner">
         <div className="container">
           <div className="row justify-content-center">
             <div className="col-xl-6">
-              <form
-                className="form-search"
-                onSubmit={(e) => e.preventDefault()}
-              >
+              <form className="form-search" onSubmit={handleSubmit}>
                 <fieldset className="text">
                   <input
                     type="text"
@@ -35,7 +70,8 @@ export default function SearchProducts() {
                     className=""
                     name="text"
                     tabIndex={0}
-                    defaultValue=""
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
                     aria-required="true"
                     required
                   />
@@ -66,18 +102,51 @@ export default function SearchProducts() {
                   </svg>
                 </button>
               </form>
-              <div className="tf-col-quicklink">
-                <span className="title">{t("shop.quickLink")}</span>
-                <Link className="link" href={`/shop-default-grid`}>
-                  {t("blog.fashion")}
-                </Link>
-              </div>
+              {!hasSearched && (
+                <div className="tf-col-quicklink">
+                  <span className="title">{t("shop.quickLink")}</span>
+                  <Link className="link" href={`/shop-default-grid`}>
+                    {t("blog.fashion")}
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </section>
-      {/* Top pick */}
-      {products.length > 0 && (
+
+      {/* Search results */}
+      {hasSearched && (
+        <section className="flat-spacing pt-0">
+          <div className="container">
+            {loading ? (
+              <div className="text-center py-5">
+                <div className="spinner-border" role="status">
+                  <span className="visually-hidden">{t("search.loading")}</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="mb_20 text-secondary">
+                  {results.length > 0
+                    ? `${results.length} ${t("search.resultsFound")}`
+                    : t("search.noProductsFound")}
+                </p>
+                {results.length > 0 && (
+                  <div className="tf-grid-layout tf-col-2 lg-col-3 xl-col-4">
+                    {results.map((product, i) => (
+                      <ProductCard1 product={product} key={product.id || i} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Recent products — shown only when no search has been made */}
+      {!hasSearched && recentProducts.length > 0 && (
         <section className="flat-spacing pt-0">
           <div className="container">
             <div className="heading-section text-center wow fadeInUp">
@@ -98,12 +167,11 @@ export default function SearchProducts() {
                 el: ".spd4",
               }}
             >
-              {products.map((product, i) => (
+              {recentProducts.map((product, i) => (
                 <SwiperSlide key={product.id || i} className="swiper-slide">
                   <ProductCard1 product={product} />
                 </SwiperSlide>
               ))}
-
               <div className="sw-pagination-latest spd4 sw-dots type-circle justify-content-center" />
             </Swiper>
           </div>

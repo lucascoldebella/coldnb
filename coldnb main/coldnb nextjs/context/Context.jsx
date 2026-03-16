@@ -1,8 +1,10 @@
 "use client";
 import { openCartModal } from "@/utlis/openCartModal";
 import { openWistlistModal } from "@/utlis/openWishlist";
+import supabase from "@/lib/supabase";
+import { cartApi } from "@/lib/userApi";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { useContext, useState } from "react";
 const dataContext = React.createContext();
 export const useContextElement = () => {
@@ -18,6 +20,22 @@ export default function Context({ children }) {
   });
   const [quickAddItem, setQuickAddItem] = useState(null);
   const [totalPrice, setTotalPrice] = useState(0);
+
+  /* Track auth state for server cart sync */
+  const sessionRef = useRef(null);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      sessionRef.current = session;
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      sessionRef.current = session;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const isAuthenticated = () => !!sessionRef.current;
+
   useEffect(() => {
     const subtotal = cartProducts.reduce((accumulator, product) => {
       return accumulator + product.quantity * product.price;
@@ -37,13 +55,29 @@ export default function Context({ children }) {
     if (!product || typeof product !== "object" || !product.id) return;
 
     if (!isAddedToCartProducts(product.id)) {
+      const quantity = qty ? qty : 1;
       const item = {
         ...product,
-        quantity: qty ? qty : 1,
+        quantity,
       };
       setCartProducts((pre) => [...pre, item]);
       if (isModal) {
         openCartModal();
+      }
+
+      /* Sync to server if authenticated */
+      if (isAuthenticated()) {
+        cartApi.add(product.id, quantity).then((res) => {
+          const cartItemId = res.data?.data?.id;
+          if (cartItemId) {
+            setCartProducts((prev) =>
+              prev.map((p) => p.id === product.id && !p.cartItemId
+                ? { ...p, cartItemId }
+                : p
+              )
+            );
+          }
+        }).catch(() => {});
       }
     }
   };
@@ -57,8 +91,30 @@ export default function Context({ children }) {
       item.quantity = qty / 1;
       items[itemIndex] = item;
       setCartProducts(items);
+
+      /* Sync to server if authenticated */
+      if (isAuthenticated() && item.cartItemId) {
+        cartApi.update(item.cartItemId, qty / 1).catch(() => {});
+      }
     }
   };
+
+  const removeFromCart = useCallback((id) => {
+    const item = cartProducts.find((elm) => elm.id == id);
+    setCartProducts((pre) => pre.filter((elm) => elm.id != id));
+
+    /* Sync to server if authenticated */
+    if (isAuthenticated() && item?.cartItemId) {
+      cartApi.remove(item.cartItemId).catch(() => {});
+    }
+  }, [cartProducts]);
+
+  const clearCart = useCallback(() => {
+    setCartProducts([]);
+    if (isAuthenticated()) {
+      cartApi.clear().catch(() => {});
+    }
+  }, []);
 
   const addToWishlist = (id) => {
     if (!wishList.includes(id)) {
@@ -121,6 +177,8 @@ export default function Context({ children }) {
     totalPrice,
     addProductToCart,
     isAddedToCartProducts,
+    removeFromCart,
+    clearCart,
     removeFromWishlist,
     addToWishlist,
     isAddedtoWishlist,

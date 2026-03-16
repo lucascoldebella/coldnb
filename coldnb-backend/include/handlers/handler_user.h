@@ -18,4 +18,7 @@ void handler_user_profile_update(HttpRequest *req, HttpResponse *resp, void *use
 /* DELETE /api/user/profile - Delete authenticated user account */
 void handler_user_profile_delete(HttpRequest *req, HttpResponse *resp, void *user_data);
 
+/* GET /api/user/export - GDPR data export (download all user data as JSON) */
+void handler_user_data_export(HttpRequest *req, HttpResponse *resp, void *user_data);
+
 #endif /* COLDNB_HANDLER_USER_H */

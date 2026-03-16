@@ -12,12 +12,9 @@ export default function CartModal() {
     totalPrice,
     addProductToCart,
     isAddedToCartProducts,
+    removeFromCart,
   } = useContextElement();
   const { t } = useLanguage();
-
-  const removeItem = (id) => {
-    setCartProducts((pre) => [...pre.filter((elm) => elm.id != id)]);
-  };
 
   const [currentOpenPopup, setCurrentOpenPopup] = useState("");
   const [recommendations, setRecommendations] = useState([]);
@@ -133,7 +130,7 @@ export default function CartModal() {
                                 </div>
                                 <div
                                   className="text-button tf-btn-remove remove"
-                                  onClick={() => removeItem(product.id)}
+                                  onClick={() => removeFromCart(product.id)}
                                 >
                                   {t("cart.remove")}
                                 </div>
